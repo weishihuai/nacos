@@ -59,11 +59,18 @@ public class ServiceManager {
      * @return if service is exist, return exist service, otherwise return new service
      */
     public Service getSingleton(Service service) {
+        // 如果service在singletonRepository中找不到，则存入到singletonRepository中；否则返回已存在的Service
         singletonRepository.computeIfAbsent(service, key -> {
             NotifyCenter.publishEvent(new MetadataEvent.ServiceMetadataEvent(service, false));
             return service;
         });
+
+        // 然后从singletonRepository中拿出来
+        // ConcurrentHashMap<Service, Service> singletonRepository
         Service result = singletonRepository.get(service);
+
+        // namespaceSingletonMaps其实是按照NamespaceId来存放所有的Service
+        // ConcurrentHashMap<String, Set<Service>> namespaceSingletonMaps;
         namespaceSingletonMaps.computeIfAbsent(result.getNamespace(), namespace -> new ConcurrentHashSet<>());
         namespaceSingletonMaps.get(result.getNamespace()).add(result);
         return result;

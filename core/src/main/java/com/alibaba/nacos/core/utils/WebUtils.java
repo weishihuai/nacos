@@ -79,10 +79,13 @@ public class WebUtils {
      * @return value
      */
     public static String optional(final HttpServletRequest req, final String key, final String defaultValue) {
+        // 从request请求参数中获取指定key的值
         String value = req.getParameter(key);
         if (StringUtils.isBlank(value)) {
+            // 如果为空，则返回指定的默认值
             return defaultValue;
         }
+        // 如果非空，还需要进行解码处理
         String encoding = req.getParameter(ENCODING_KEY);
         return resolveValue(value, encoding);
     }

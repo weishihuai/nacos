@@ -35,12 +35,15 @@ public interface Client {
     /**
      * Get the unique id of current client.
      *
+     * 客户端id/gRPC的connectionId
+     *
      * @return id of client
      */
     String getClientId();
     
     /**
      * Whether is ephemeral of current client.
+     * 是否临时客户端
      *
      * @return true if client is ephemeral, otherwise false
      */
@@ -48,6 +51,7 @@ public interface Client {
     
     /**
      * Set the last time for updating current client as current time.
+     * 客户端更新时间
      */
     void setLastUpdatedTime();
     
@@ -60,6 +64,7 @@ public interface Client {
     
     /**
      * Add a new instance for service for current client.
+     * 服务实例注册
      *
      * @param service             publish service
      * @param instancePublishInfo instance
@@ -69,6 +74,7 @@ public interface Client {
     
     /**
      * Remove service instance from client.
+     * 服务实例注销
      *
      * @param service service of instance
      * @return instance info if exist, otherwise {@code null}
@@ -77,6 +83,7 @@ public interface Client {
     
     /**
      * Get instance info of service from client.
+     * 服务实例查询
      *
      * @param service service of instance
      * @return instance info
@@ -92,6 +99,7 @@ public interface Client {
     
     /**
      * Add a new subscriber for target service.
+     * 服务订阅
      *
      * @param service    subscribe service
      * @param subscriber subscriber
@@ -101,6 +109,7 @@ public interface Client {
     
     /**
      * Remove subscriber for service.
+     * 取消订阅
      *
      * @param service service of subscriber
      * @return true if remove successfully, otherwise false
@@ -109,6 +118,8 @@ public interface Client {
     
     /**
      * Get subscriber of service from client.
+     *
+     * 查询订阅
      *
      * @param service service of subscriber
      * @return subscriber
@@ -131,6 +142,7 @@ public interface Client {
     
     /**
      * Whether current client is expired.
+     * 是否过期
      *
      * @param currentTime unified current timestamp
      * @return true if client has expired, otherwise false
@@ -138,6 +150,7 @@ public interface Client {
     boolean isExpire(long currentTime);
     
     /**
+     * 释放资源
      * Release current client and release resources if neccessary.
      */
     void release();

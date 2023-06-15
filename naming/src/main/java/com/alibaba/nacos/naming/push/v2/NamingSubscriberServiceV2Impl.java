@@ -115,8 +115,12 @@ public class NamingSubscriberServiceV2Impl extends SmartSubscriber implements Na
     public void onEvent(Event event) {
         if (event instanceof ServiceEvent.ServiceChangedEvent) {
             // If service changed, push to all subscribers.
+
+            // 服务变更时，向所有客户端推送
             ServiceEvent.ServiceChangedEvent serviceChangedEvent = (ServiceEvent.ServiceChangedEvent) event;
+            // 获取Service服务信息
             Service service = serviceChangedEvent.getService();
+            // 添加延时任务到延时任务调度引擎，最终执行 PushDelayTaskProcessor.process
             delayTaskEngine.addTask(service, new PushDelayTask(service, PushConfig.getInstance().getPushTaskDelay()));
             MetricsMonitor.incrementServiceChangeCount(service.getNamespace(), service.getGroup(), service.getName());
         } else if (event instanceof ServiceEvent.ServiceSubscribedEvent) {

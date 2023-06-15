@@ -99,14 +99,18 @@ public class NamingUtils {
      * @param combineServiceName such as: groupName@@serviceName
      */
     public static void checkServiceNameFormat(String combineServiceName) {
+        // 使用"@@"分隔符进行切割
         String[] split = combineServiceName.split(Constants.SERVICE_INFO_SPLITER);
+        // 长度小于等于1，非法
         if (split.length <= 1) {
             throw new IllegalArgumentException(
                     "Param 'serviceName' is illegal, it should be format as 'groupName@@serviceName'");
         }
+        // 组名为空，非法
         if (split[0].isEmpty()) {
             throw new IllegalArgumentException("Param 'serviceName' is illegal, groupName can't be empty");
         }
+        // 其它情况，合法
     }
     
     /**

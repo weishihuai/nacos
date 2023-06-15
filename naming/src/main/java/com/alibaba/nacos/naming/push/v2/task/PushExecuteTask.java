@@ -58,6 +58,7 @@ public class PushExecuteTask extends AbstractExecuteTask {
         try {
             PushDataWrapper wrapper = generatePushData();
             ClientManager clientManager = delayTaskEngine.getClientManager();
+            // 获取所有客户端或指定的客户端
             for (String each : getTargetClientIds()) {
                 Client client = clientManager.getClient(each);
                 if (null == client) {

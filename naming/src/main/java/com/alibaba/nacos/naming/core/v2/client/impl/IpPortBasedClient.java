@@ -86,6 +86,7 @@ public class IpPortBasedClient extends AbstractClient {
     
     @Override
     public boolean addServiceInstance(Service service, InstancePublishInfo instancePublishInfo) {
+        // 将instancePublishInfo转成HealthCheckInstancePublishInfo
         return super.addServiceInstance(service, parseToHealthCheckInstance(instancePublishInfo));
     }
     

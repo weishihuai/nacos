@@ -108,7 +108,18 @@ public class InstanceBuilder {
     }
     
     /**
+     * 构建一个新的服务实例
      * Build a new {@link Instance}.
+     *
+     * instanceId：实例的唯一ID;
+     * ip：实例IP，提供给消费者进行通信的地址;
+     * port：端口，提供给消费者访问的端口;
+     * weight：权重，当前实例的权限，浮点类型(默认1.0D);
+     * healthy：健康状况，默认true;
+     * enabled：实例是否准备好接收请求，默认true;
+     * ephemeral：实例是否为瞬时的，默认为true;
+     * clusterName：实例所属的集群名称;
+     * serviceName：实例的服务信息;
      *
      * @return new instance
      */
@@ -117,30 +128,39 @@ public class InstanceBuilder {
         if (!Objects.isNull(instanceId)) {
             result.setInstanceId(instanceId);
         }
+        // 设置IP地址
         if (!Objects.isNull(ip)) {
             result.setIp(ip);
         }
+        // 设置服务端口
         if (!Objects.isNull(port)) {
             result.setPort(port);
         }
+        // 设置权重
         if (!Objects.isNull(weight)) {
             result.setWeight(weight);
         }
+        // 设置实例健康状态
         if (!Objects.isNull(healthy)) {
             result.setHealthy(healthy);
         }
+        // 设置是否启用
         if (!Objects.isNull(enabled)) {
             result.setEnabled(enabled);
         }
+        // 设置是否临时实例
         if (!Objects.isNull(ephemeral)) {
             result.setEphemeral(ephemeral);
         }
+        // 设置集群名称
         if (!Objects.isNull(clusterName)) {
             result.setClusterName(clusterName);
         }
+        // 设置服务名称
         if (!Objects.isNull(serviceName)) {
             result.setServiceName(serviceName);
         }
+        // 设置实例名称
         result.setMetadata(metadata);
         return result;
     }

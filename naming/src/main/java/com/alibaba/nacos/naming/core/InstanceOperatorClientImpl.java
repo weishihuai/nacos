@@ -100,12 +100,26 @@ public class InstanceOperatorClientImpl implements InstanceOperator {
      */
     @Override
     public void registerInstance(String namespaceId, String serviceName, Instance instance) throws NacosException {
+        // 实例活动状态检查  即实例需要满足：心跳超时时间 > 心跳间隔、IP 删除超时时间 > 心跳间隔
         NamingUtils.checkInstanceIsLegal(instance);
-        
+
+        // 是否临时实例，默认为true
         boolean ephemeral = instance.isEphemeral();
+
+        // instance.toInetAddr()返回IP+":"+端口号，在本例中clientId=172.110.0.138:1001#true
+        // 获取客户端ID
         String clientId = IpPortBasedClient.getClientId(instance.toInetAddr(), ephemeral);
+
+        // 向clientManager中注册客户端，后面会获取进行使用的,其实这就是客户端管理的地方
         createIpPortClientIfAbsent(clientId);
+
+        // 通过namespaceId+组名+服务名称+是否临时实例，创建出一个Service
+        // namespaceId=public
+        // serviceName=DEFAULT_GROUP@@discovery-provider
+        // ephemeral=true
         Service service = getService(namespaceId, serviceName, ephemeral);
+
+        // 注册服务实例
         clientOperationService.registerInstance(service, instance, clientId);
     }
     
@@ -340,8 +354,11 @@ public class InstanceOperatorClientImpl implements InstanceOperator {
     }
     
     private Service getService(String namespaceId, String serviceName, boolean ephemeral) {
+        // 获取服务组名DEFAULT_GROUP
         String groupName = NamingUtils.getGroupName(serviceName);
+        // 获取服务名称discovery-provider
         String serviceNameNoGrouped = NamingUtils.getServiceName(serviceName);
+        // new Service(namespace, group, name, ephemeral)
         return Service.newService(namespaceId, groupName, serviceNameNoGrouped, ephemeral);
     }
     

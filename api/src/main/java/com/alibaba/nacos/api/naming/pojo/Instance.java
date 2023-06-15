@@ -34,24 +34,24 @@ import java.util.Objects;
  */
 @JsonInclude(Include.NON_NULL)
 public class Instance implements Serializable {
-    
+
     private static final long serialVersionUID = -742906310567291979L;
-    
+
     /**
      * unique id of this instance.
      */
     private String instanceId;
-    
+
     /**
      * instance ip.
      */
     private String ip;
-    
+
     /**
      * instance port.
      */
     private int port;
-    
+
     /**
      * instance weight.
      */
@@ -73,86 +73,86 @@ public class Instance implements Serializable {
      * @since 1.0.0
      */
     private boolean ephemeral = true;
-    
+
     /**
      * cluster information of instance.
      */
     private String clusterName;
-    
+
     /**
      * Service information of instance.
      */
     private String serviceName;
-    
+
     /**
      * user extended attributes.
      */
     private Map<String, String> metadata = new HashMap<>();
-    
+
     public String getInstanceId() {
         return this.instanceId;
     }
-    
+
     public void setInstanceId(final String instanceId) {
         this.instanceId = instanceId;
     }
-    
+
     public String getIp() {
         return this.ip;
     }
-    
+
     public void setIp(final String ip) {
         this.ip = ip;
     }
-    
+
     public int getPort() {
         return this.port;
     }
-    
+
     public void setPort(final int port) {
         this.port = port;
     }
-    
+
     public double getWeight() {
         return this.weight;
     }
-    
+
     public void setWeight(final double weight) {
         this.weight = weight;
     }
-    
+
     public boolean isHealthy() {
         return this.healthy;
     }
-    
+
     public void setHealthy(final boolean healthy) {
         this.healthy = healthy;
     }
-    
+
     public String getClusterName() {
         return this.clusterName;
     }
-    
+
     public void setClusterName(final String clusterName) {
         this.clusterName = clusterName;
     }
-    
+
     public String getServiceName() {
         return this.serviceName;
     }
-    
+
     public void setServiceName(final String serviceName) {
         this.serviceName = serviceName;
     }
-    
+
     public Map<String, String> getMetadata() {
         return this.metadata;
     }
-    
+
     public void setMetadata(final Map<String, String> metadata) {
         this.metadata = metadata;
     }
-    
+
     /**
      * add meta data.
      *
@@ -165,23 +165,23 @@ public class Instance implements Serializable {
         }
         metadata.put(key, value);
     }
-    
+
     public boolean isEnabled() {
         return this.enabled;
     }
-    
+
     public void setEnabled(final boolean enabled) {
         this.enabled = enabled;
     }
-    
+
     public boolean isEphemeral() {
         return this.ephemeral;
     }
-    
+
     public void setEphemeral(final boolean ephemeral) {
         this.ephemeral = ephemeral;
     }
-    
+
     @Override
     public String toString() {
         return "Instance{" + "instanceId='" + instanceId + '\'' + ", ip='" + ip + '\'' + ", port=" + port + ", weight="
@@ -189,50 +189,66 @@ public class Instance implements Serializable {
                 + ", clusterName='" + clusterName + '\'' + ", serviceName='" + serviceName + '\'' + ", metadata="
                 + metadata + '}';
     }
-    
+
     public String toInetAddr() {
         return ip + ":" + port;
     }
-    
+
     @Override
     public boolean equals(final Object obj) {
         if (!(obj instanceof Instance)) {
             return false;
         }
-        
+
         final Instance host = (Instance) obj;
         return Instance.strEquals(host.toString(), toString());
     }
-    
+
     @Override
     public int hashCode() {
         return toString().hashCode();
     }
-    
+
     private static boolean strEquals(final String str1, final String str2) {
         return Objects.equals(str1, str2);
     }
-    
+
+    /**
+     * 心跳间隙的key，默认为5s，也就是默认5秒进行一次心跳
+     * @return
+     */
     public long getInstanceHeartBeatInterval() {
         return getMetaDataByKeyWithDefault(PreservedMetadataKeys.HEART_BEAT_INTERVAL,
                 Constants.DEFAULT_HEART_BEAT_INTERVAL);
     }
-    
+
+    /**
+     * 心跳超时的key，默认为15s，也就是默认15秒收不到心跳，实例将会标记为不健康
+     * @return
+     */
     public long getInstanceHeartBeatTimeOut() {
         return getMetaDataByKeyWithDefault(PreservedMetadataKeys.HEART_BEAT_TIMEOUT,
                 Constants.DEFAULT_HEART_BEAT_TIMEOUT);
     }
-    
+
+    /**
+     * 实例IP被删除的key，默认为30s，也就是30秒收不到心跳，实例将会被移除
+     * @return
+     */
     public long getIpDeleteTimeout() {
         return getMetaDataByKeyWithDefault(PreservedMetadataKeys.IP_DELETE_TIMEOUT,
                 Constants.DEFAULT_IP_DELETE_TIMEOUT);
     }
-    
+
+    /**
+     * 实例ID生成器key，默认为simple
+     * @return
+     */
     public String getInstanceIdGenerator() {
         return getMetaDataByKeyWithDefault(PreservedMetadataKeys.INSTANCE_ID_GENERATOR,
                 Constants.DEFAULT_INSTANCE_ID_GENERATOR);
     }
-    
+
     /**
      * Returns {@code true} if this metadata contains the specified key.
      *
@@ -245,7 +261,7 @@ public class Instance implements Serializable {
         }
         return getMetadata().containsKey(key);
     }
-    
+
     private long getMetaDataByKeyWithDefault(final String key, final long defaultValue) {
         if (getMetadata() == null || getMetadata().isEmpty()) {
             return defaultValue;
@@ -256,12 +272,12 @@ public class Instance implements Serializable {
         }
         return defaultValue;
     }
-    
+
     private String getMetaDataByKeyWithDefault(final String key, final String defaultValue) {
         if (getMetadata() == null || getMetadata().isEmpty()) {
             return defaultValue;
         }
         return getMetadata().get(key);
     }
-    
+
 }

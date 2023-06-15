@@ -68,10 +68,12 @@ public class HttpRequestInstanceBuilder {
      * @return new instance
      */
     public Instance build() {
+        // 构建服务实例，包括设置服务名称、服务端口号、服务IP地址等属性
         Instance result = actualBuilder.build();
         for (InstanceExtensionHandler each : handlers) {
             each.handleExtensionInfo(result);
         }
+        // 设置服务实例ID。格式：【ip地址 + "#" + 端口号 + "#" + 集群名称 + "#" + 服务名称】
         setInstanceId(result);
         return result;
     }
@@ -144,6 +146,7 @@ public class HttpRequestInstanceBuilder {
     private void setInstanceId(Instance instance) {
         DefaultInstanceIdGenerator idGenerator = new DefaultInstanceIdGenerator(instance.getServiceName(),
                 instance.getClusterName(), instance.getIp(), instance.getPort());
+        // 设置实例ID: 172.110.0.138#1001#DEFAULT#DEFAULT_GROUP@@discovery-provider
         instance.setInstanceId(idGenerator.generateInstanceId());
     }
 }

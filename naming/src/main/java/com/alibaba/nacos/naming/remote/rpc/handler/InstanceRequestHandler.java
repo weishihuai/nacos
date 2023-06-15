@@ -49,11 +49,15 @@ public class InstanceRequestHandler extends RequestHandler<InstanceRequest, Inst
     @Override
     @Secured(action = ActionTypes.WRITE)
     public InstanceResponse handle(InstanceRequest request, RequestMeta meta) throws NacosException {
+        // 根据命名空间ID、组名、服务名、是否临时实例（默认为true）创建一个Service
         Service service = Service
                 .newService(request.getNamespace(), request.getGroupName(), request.getServiceName(), true);
+        // 根据客户端请求类型进行不同的处理： 注册 or 下线
         switch (request.getType()) {
+            // 处理注册实例请求
             case NamingRemoteConstants.REGISTER_INSTANCE:
                 return registerInstance(service, request, meta);
+            // 处理下线实例请求
             case NamingRemoteConstants.DE_REGISTER_INSTANCE:
                 return deregisterInstance(service, request, meta);
             default:
@@ -64,10 +68,13 @@ public class InstanceRequestHandler extends RequestHandler<InstanceRequest, Inst
     
     private InstanceResponse registerInstance(Service service, InstanceRequest request, RequestMeta meta)
             throws NacosException {
+        // 注册实例
         clientOperationService.registerInstance(service, request.getInstance(), meta.getConnectionId());
+        // 发布注册实例跟踪事件
         NotifyCenter.publishEvent(new RegisterInstanceTraceEvent(System.currentTimeMillis(),
                 meta.getClientIp(), true, service.getNamespace(), service.getGroup(), service.getName(),
                 request.getInstance().getIp(), request.getInstance().getPort()));
+        // 对rpcClient进行应答
         return new InstanceResponse(NamingRemoteConstants.REGISTER_INSTANCE);
     }
     

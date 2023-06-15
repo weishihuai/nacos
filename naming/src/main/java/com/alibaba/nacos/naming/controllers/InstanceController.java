@@ -91,26 +91,33 @@ public class InstanceController {
     }
     
     /**
+     * Nacos服务端注册服务实例
      * Register new instance.
      *
      * @param request http request
-     * @return 'ok' if success
+     * @return 'ok' if success 如果成功的话，返回ok
      * @throws Exception any error during register
      */
     @CanDistro
     @PostMapping
     @Secured(action = ActionTypes.WRITE)
     public String register(HttpServletRequest request) throws Exception {
-        
+        // 获取命名空间ID，实际上就是从请求参数中获取namespaceId的值.  本例中namespaceId的值是public
         final String namespaceId = WebUtils
                 .optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
+        // 获取带组名的服务名称，实际上就是从请求参数中获取serviceName的值。 本例中serviceName的值是DEFAULT_GROUP@@discovery-provider
         final String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
+        // 检查服务名称是否合法
         NamingUtils.checkServiceNameFormat(serviceName);
-        
+
+        // 根据客户端传递的参数构建Instance服务实例
         final Instance instance = HttpRequestInstanceBuilder.newBuilder()
                 .setDefaultInstanceEphemeral(switchDomain.isDefaultInstanceEphemeral()).setRequest(request).build();
-        
+
+        // 注册服务实例
         getInstanceOperator().registerInstance(namespaceId, serviceName, instance);
+
+        // 发布事件
         NotifyCenter.publishEvent(new RegisterInstanceTraceEvent(System.currentTimeMillis(), "", false, namespaceId,
                 NamingUtils.getGroupName(serviceName), NamingUtils.getServiceName(serviceName), instance.getIp(),
                 instance.getPort()));

@@ -50,7 +50,8 @@ public abstract class BaseRpcServer {
         String tlsConfig = JacksonUtils.toJson(rpcServerTlsConfig);
         Loggers.REMOTE.info("Nacos {} Rpc server starting at port {} and tls config:{}", serverName, getServicePort(),
                 tlsConfig);
-        
+
+        // 启动Grpc服务
         startServer();
         
         if (RpcServerSslContextRefresherHolder.getInstance() != null) {
@@ -59,6 +60,7 @@ public abstract class BaseRpcServer {
         
         Loggers.REMOTE.info("Nacos {} Rpc server started at port {} and tls config:{}", serverName, getServicePort(),
                 tlsConfig);
+        // JVM关闭时,关闭Grpc服务
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             Loggers.REMOTE.info("Nacos {} Rpc server stopping", serverName);
             try {

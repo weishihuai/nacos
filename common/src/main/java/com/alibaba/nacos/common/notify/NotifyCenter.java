@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static com.alibaba.nacos.api.exception.NacosException.SERVER_ERROR;
 
 /**
+ * 统一事件通知中心
  * Unified Event Notify Center.
  *
  * @author <a href="mailto:liaochuntao@live.com">liaochuntao</a>
@@ -45,15 +46,24 @@ import static com.alibaba.nacos.api.exception.NacosException.SERVER_ERROR;
 public class NotifyCenter {
     
     private static final Logger LOGGER = LoggerFactory.getLogger(NotifyCenter.class);
-    
+
+    /**
+     * ringBufferSize/shareBufferSize这两个变量因为在静态块中初始化，然后并没有改变其初始值，所以不需要特殊处理
+     */
     public static int ringBufferSize;
     
     public static int shareBufferSize;
     
     private static final AtomicBoolean CLOSED = new AtomicBoolean(false);
-    
+
+    /**
+     * EventPublisher工厂
+     */
     private static final EventPublisherFactory DEFAULT_PUBLISHER_FACTORY;
-    
+
+    /**
+     * 单例，整个进程共享这个实例，需要考虑并发问题
+     */
     private static final NotifyCenter INSTANCE = new NotifyCenter();
     
     private DefaultSharePublisher sharePublisher;
@@ -64,29 +74,39 @@ public class NotifyCenter {
      * Publisher management container.
      */
     private final Map<String, EventPublisher> publisherMap = new ConcurrentHashMap<>(16);
-    
+
+    // 静态代码块进行一些初始化工作
     static {
         // Internal ArrayBlockingQueue buffer size. For applications with high write throughput,
         // this value needs to be increased appropriately. default value is 16384
+
+        // 默认的生产者的阻塞队列大小
         String ringBufferSizeProperty = "nacos.core.notify.ring-buffer-size";
+        // Integer.getInteger获取系统属性的值 System.getProperty("xxx")
         ringBufferSize = Integer.getInteger(ringBufferSizeProperty, 16384);
-        
+
+        // 共享生产者阻塞队列大小
         // The size of the public publisher's message staging queue buffer
         String shareBufferSizeProperty = "nacos.core.notify.share-buffer-size";
+        // Integer.getInteger获取系统属性的值 System.getProperty("xxx")
         shareBufferSize = Integer.getInteger(shareBufferSizeProperty, 1024);
-        
+
+        // 这里采用了SPI的扩展机制，里面包含了JDK原生的SPI扩展机制，不过Nacos对这部分的内容加了缓存
         final Collection<EventPublisher> publishers = NacosServiceLoader.load(EventPublisher.class);
         Iterator<EventPublisher> iterator = publishers.iterator();
-        
+
         if (iterator.hasNext()) {
             clazz = iterator.next().getClass();
         } else {
+            // 没有配置，就用默认的DefaultPublisher生产者
             clazz = DefaultPublisher.class;
         }
-        
+
+        // 创建一个发布工厂，主要是对生产者进行创建并初始化
         DEFAULT_PUBLISHER_FACTORY = (cls, buffer) -> {
             try {
                 EventPublisher publisher = clazz.newInstance();
+                // 实际上是对于每个publisher都启动了一个线程
                 publisher.init(cls, buffer);
                 return publisher;
             } catch (Throwable ex) {
@@ -96,7 +116,8 @@ public class NotifyCenter {
         };
         
         try {
-            
+
+            // 共享的生产者
             // Create and init DefaultSharePublisher instance.
             INSTANCE.sharePublisher = new DefaultSharePublisher();
             INSTANCE.sharePublisher.init(SlowEvent.class, shareBufferSize);
@@ -211,6 +232,7 @@ public class NotifyCenter {
             MapUtil.computeIfAbsent(INSTANCE.publisherMap, topic, factory, subscribeType, ringBufferSize);
         }
         EventPublisher publisher = INSTANCE.publisherMap.get(topic);
+        // 将订阅者放入EventPublisher中
         if (publisher instanceof ShardedEventPublisher) {
             ((ShardedEventPublisher) publisher).addSubscriber(consumer, subscribeType);
         } else {
@@ -296,7 +318,8 @@ public class NotifyCenter {
         }
         
         final String topic = ClassUtils.getCanonicalName(eventType);
-        
+
+        // 获取对应的EventPublisher进行发布，也就是通知订阅者去处理
         EventPublisher publisher = INSTANCE.publisherMap.get(topic);
         if (publisher != null) {
             return publisher.publish(event);

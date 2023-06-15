@@ -31,7 +31,11 @@ import java.util.concurrent.locks.ReentrantLock;
  * @author zongtanghu
  */
 public class DefaultSharePublisher extends DefaultPublisher implements ShardedEventPublisher {
-    
+
+    /**
+     * key是SlowEvent, value是Set<Subscriber>
+     * 每一种事件，一个Set，共享同一个DefaultPublisher，处理比较耗时的一些事件
+     */
     private final Map<Class<? extends SlowEvent>, Set<Subscriber>> subMappings = new ConcurrentHashMap<>();
     
     private final Lock lock = new ReentrantLock();

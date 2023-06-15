@@ -54,23 +54,47 @@ public class EphemeralClientOperationServiceImpl implements ClientOperationServi
     
     @Override
     public void registerInstance(Service service, Instance instance, String clientId) throws NacosException {
+        // 实例活动状态检查  即实例需要满足：心跳超时时间 > 心跳间隔、IP 删除超时时间 > 心跳间隔
         NamingUtils.checkInstanceIsLegal(instance);
-    
+
+        // ServiceManager.getInstance()使用饿汉式单例返回一个ServiceManager对象
+        // getSingleton从缓存singletonRepository中获取一个单例Service
         Service singleton = ServiceManager.getInstance().getSingleton(service);
+
+        // 判断获取到的service是否是临时实例，如果不是，则报错，因为当前的service（EphemeralClientOperationServiceImpl）就是处理临时实例的
         if (!singleton.isEphemeral()) {
             throw new NacosRuntimeException(NacosException.INVALID_PARAM,
                     String.format("Current service %s is persistent service, can't register ephemeral instance.",
                             singleton.getGroupedServiceName()));
         }
+
+        // 根据clientId从客户端管理器中获取对应的客户端
+        // clientId=172.110.0.138:1001#true
         Client client = clientManager.getClient(clientId);
+
+        // 判断Client是否合法：
+        // 1、client是否为空，为空代表客户端已经断开连接，非法
+        // 2、client是否为临时的，如果非临时的连接，非法，直接返回
         if (!clientIsLegal(client, clientId)) {
             return;
         }
+
+        // 获取实例发布信息，包含一些属性，如实例IP、实例ID、端口号等等
         InstancePublishInfo instanceInfo = getPublishInfo(instance);
+
+        // 添加一个服务实例到发布列表中（publishers）
+        // key: Service     value: 实例发布信息
+
+        // com.alibaba.nacos.naming.core.v2.client.AbstractClient.publishers
+        // protected final ConcurrentHashMap<Service, InstancePublishInfo> publishers = new ConcurrentHashMap<>(16, 0.75f, 1);
         client.addServiceInstance(singleton, instanceInfo);
+
+        // 设置客户端最后更新时间为当前时间
         client.setLastUpdatedTime();
         client.recalculateRevision();
+        // 发布客户端注册事件通知订阅者, Nacos使用了发布-订阅模式来处理. 简单理解就是，事件发布器发布相应的事件，然后对事件感兴趣的订阅者就会进行相应的处理，解耦
         NotifyCenter.publishEvent(new ClientOperationEvent.ClientRegisterServiceEvent(singleton, clientId));
+        // 发布实例元数据事件通知订阅者
         NotifyCenter
                 .publishEvent(new MetadataEvent.InstanceMetadataEvent(singleton, instanceInfo.getMetadataId(), false));
     }

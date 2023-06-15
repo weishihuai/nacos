@@ -87,7 +87,9 @@ public abstract class BaseGrpcServer extends BaseRpcServer {
     @Override
     public void startServer() throws Exception {
         final MutableHandlerRegistry handlerRegistry = new MutableHandlerRegistry();
+        // 注册服务
         addServices(handlerRegistry, new GrpcConnectionInterceptor());
+
         NettyServerBuilder builder = NettyServerBuilder.forPort(getServicePort()).executor(getRpcExecutor());
         
         if (rpcServerTlsConfig.getEnableTls()) {
@@ -95,7 +97,8 @@ public abstract class BaseGrpcServer extends BaseRpcServer {
                     new OptionalTlsProtocolNegotiator(getSslContextBuilder(), rpcServerTlsConfig.getCompatibility()));
             
         }
-        
+
+        // 创建Grpc的server端
         server = builder.maxInboundMessageSize(getMaxInboundMessageSize()).fallbackHandlerRegistry(handlerRegistry)
                 .compressorRegistry(CompressorRegistry.getDefaultInstance())
                 .decompressorRegistry(DecompressorRegistry.getDefaultInstance())
@@ -103,7 +106,8 @@ public abstract class BaseGrpcServer extends BaseRpcServer {
                 .keepAliveTime(getKeepAliveTime(), TimeUnit.MILLISECONDS)
                 .keepAliveTimeout(getKeepAliveTimeout(), TimeUnit.MILLISECONDS)
                 .permitKeepAliveTime(getPermitKeepAliveTime(), TimeUnit.MILLISECONDS).build();
-        
+
+        // 启动Grpc的server端
         server.start();
     }
     
@@ -153,7 +157,8 @@ public abstract class BaseGrpcServer extends BaseRpcServer {
                                 GrpcServerConstants.REQUEST_METHOD_NAME))
                 .setRequestMarshaller(ProtoUtils.marshaller(Payload.getDefaultInstance()))
                 .setResponseMarshaller(ProtoUtils.marshaller(Payload.getDefaultInstance())).build();
-        
+
+        // 处理类
         final ServerCallHandler<Payload, Payload> payloadHandler = ServerCalls.asyncUnaryCall(
                 (request, responseObserver) -> grpcCommonRequestAcceptor.request(request, responseObserver));
         
