@@ -91,6 +91,8 @@ public class InstanceController {
     }
     
     /**
+     * Nacos Server接收服务注册请求的入口（http方式）
+     *
      * Nacos服务端注册服务实例
      * Register new instance.
      *
@@ -114,7 +116,8 @@ public class InstanceController {
         final Instance instance = HttpRequestInstanceBuilder.newBuilder()
                 .setDefaultInstanceEphemeral(switchDomain.isDefaultInstanceEphemeral()).setRequest(request).build();
 
-        // 注册服务实例
+        // 真正注册服务的地方，serviceName为注册的服务名，namespaceId默认为public
+        // namespaceId可以做一层数据隔离
         getInstanceOperator().registerInstance(namespaceId, serviceName, instance);
 
         // 发布事件
@@ -125,6 +128,8 @@ public class InstanceController {
     }
     
     /**
+     * /
+     * 服务端处理下线服务实例
      * Deregister instances.
      *
      * @param request http request
@@ -135,13 +140,18 @@ public class InstanceController {
     @DeleteMapping
     @Secured(action = ActionTypes.WRITE)
     public String deregister(HttpServletRequest request) throws Exception {
+        // 根据客户端传递的参数构建Instance服务实例
         Instance instance = HttpRequestInstanceBuilder.newBuilder()
                 .setDefaultInstanceEphemeral(switchDomain.isDefaultInstanceEphemeral()).setRequest(request).build();
+        // 获取命名空间ID。 默认为public
         String namespaceId = WebUtils.optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
+        // 获取服务名称
         String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
+        // 检查服务名称是否合法
         NamingUtils.checkServiceNameFormat(serviceName);
-        
+        // 移除服务实例
         getInstanceOperator().removeInstance(namespaceId, serviceName, instance);
+        // 发布实例下线事件
         NotifyCenter.publishEvent(new DeregisterInstanceTraceEvent(System.currentTimeMillis(), "", false,
                 DeregisterInstanceReason.REQUEST, namespaceId, NamingUtils.getGroupName(serviceName),
                 NamingUtils.getServiceName(serviceName), instance.getIp(), instance.getPort()));

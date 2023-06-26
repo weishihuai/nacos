@@ -125,13 +125,18 @@ public class InstanceOperatorClientImpl implements InstanceOperator {
     
     @Override
     public void removeInstance(String namespaceId, String serviceName, Instance instance) {
+        // 是否临时实例信息
         boolean ephemeral = instance.isEphemeral();
+        // 获取客户端ID
         String clientId = IpPortBasedClient.getClientId(instance.toInetAddr(), ephemeral);
         if (!clientManager.contains(clientId)) {
             Loggers.SRV_LOG.warn("remove instance from non-exist client: {}", clientId);
             return;
         }
+        // 获取服务信息
         Service service = getService(namespaceId, serviceName, ephemeral);
+        // 下线实例
+        // 将当前下线实例信息，从发布者集合中移除出去，之后发布事件告知其他订阅者
         clientOperationService.deregisterInstance(service, instance, clientId);
     }
     

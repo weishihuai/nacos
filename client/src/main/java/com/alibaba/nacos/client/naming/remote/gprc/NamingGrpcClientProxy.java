@@ -221,7 +221,9 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
         NAMING_LOGGER
                 .info("[DEREGISTER-SERVICE] {} deregistering service {} with instance: {}", namespaceId, serviceName,
                         instance);
+        // 从缓存中获取到对应的实例，并设置取消注册状态为true
         redoService.instanceDeregister(serviceName, groupName);
+        // 服务下线
         doDeregisterService(serviceName, groupName, instance);
     }
     
@@ -234,8 +236,10 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
      * @throws NacosException nacos exception
      */
     public void doDeregisterService(String serviceName, String groupName, Instance instance) throws NacosException {
+        // type="deregisterInstance" 即服务下线
         InstanceRequest request = new InstanceRequest(namespaceId, serviceName, groupName,
                 NamingRemoteConstants.DE_REGISTER_INSTANCE, instance);
+        // 请求服务端下线服务实例
         requestToServer(request, Response.class);
         redoService.instanceDeregistered(serviceName, groupName);
     }

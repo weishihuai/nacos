@@ -42,7 +42,10 @@ import static com.alibaba.nacos.naming.constants.ClientConstants.REVISION;
  * @author xiweng.yy
  */
 public abstract class AbstractClient implements Client {
-    
+
+    /**
+     * 发布者列表
+     */
     protected final ConcurrentHashMap<Service, InstancePublishInfo> publishers = new ConcurrentHashMap<>(16, 0.75f, 1);
     
     protected final ConcurrentHashMap<Service, Subscriber> subscribers = new ConcurrentHashMap<>(16, 0.75f, 1);
@@ -70,7 +73,8 @@ public abstract class AbstractClient implements Client {
     
     @Override
     public boolean addServiceInstance(Service service, InstancePublishInfo instancePublishInfo) {
-        //     protected final ConcurrentHashMap<Service, InstancePublishInfo> publishers = new ConcurrentHashMap<>(16, 0.75f, 1);
+        //  protected final ConcurrentHashMap<Service, InstancePublishInfo> publishers = new ConcurrentHashMap<>(16, 0.75f, 1);
+        // 将实例信息添加到发布者列表publishers中
         if (null == publishers.put(service, instancePublishInfo)) {
             if (instancePublishInfo instanceof BatchInstancePublishInfo) {
                 MetricsMonitor.incrementIpCountWithBatchRegister(instancePublishInfo);
@@ -78,6 +82,7 @@ public abstract class AbstractClient implements Client {
                 MetricsMonitor.incrementInstanceCount();
             }
         }
+        // 发布一个客户端注册事件通知订阅者
         NotifyCenter.publishEvent(new ClientEvent.ClientChangedEvent(this));
         Loggers.SRV_LOG.info("Client change for service {}, {}", service, getClientId());
         return true;
@@ -85,6 +90,7 @@ public abstract class AbstractClient implements Client {
     
     @Override
     public InstancePublishInfo removeServiceInstance(Service service) {
+        // 从发布者列表中移除对应的服务实例信息
         InstancePublishInfo result = publishers.remove(service);
         if (null != result) {
             if (result instanceof BatchInstancePublishInfo) {

@@ -85,6 +85,12 @@ public class EphemeralClientOperationServiceImpl implements ClientOperationServi
         // 添加一个服务实例到发布列表中（publishers）
         // key: Service     value: 实例发布信息
 
+        /**
+         * 1. 客户端将自己注册到了服务器端的ClientManager中；
+         * 2. Client客户端内部有一个Map: ConcurrentHashMap<Service, InstancePublishInfo> publishers. 即发布者列表
+         * 3. 将实例信息放入发布者列表中
+         */
+
         // com.alibaba.nacos.naming.core.v2.client.AbstractClient.publishers
         // protected final ConcurrentHashMap<Service, InstancePublishInfo> publishers = new ConcurrentHashMap<>(16, 0.75f, 1);
         client.addServiceInstance(singleton, instanceInfo);
@@ -131,15 +137,19 @@ public class EphemeralClientOperationServiceImpl implements ClientOperationServi
             Loggers.SRV_LOG.warn("remove instance from non-exist service: {}", service);
             return;
         }
+        // 从客户端管理器中获取实例出来
         Service singleton = ServiceManager.getInstance().getSingleton(service);
         Client client = clientManager.getClient(clientId);
         if (!clientIsLegal(client, clientId)) {
             return;
         }
+        // 服务下线的时候从发布者中将实例移除
         InstancePublishInfo removedInstance = client.removeServiceInstance(singleton);
+        // 设置一下客户端更新事件
         client.setLastUpdatedTime();
         client.recalculateRevision();
         if (null != removedInstance) {
+            // 发布两个事件: 客户端下线事件、实例元数据事件
             NotifyCenter.publishEvent(new ClientOperationEvent.ClientDeregisterServiceEvent(singleton, clientId));
             NotifyCenter.publishEvent(
                     new MetadataEvent.InstanceMetadataEvent(singleton, removedInstance.getMetadataId(), true));

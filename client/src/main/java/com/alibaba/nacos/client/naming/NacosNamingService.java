@@ -159,6 +159,7 @@ public class NacosNamingService implements NamingService {
     
     @Override
     public void deregisterInstance(String serviceName, String ip, int port) throws NacosException {
+        // DEFAULT_CLUSTER_NAME = "DEFAULT"
         deregisterInstance(serviceName, ip, port, Constants.DEFAULT_CLUSTER_NAME);
     }
     
@@ -175,6 +176,7 @@ public class NacosNamingService implements NamingService {
     @Override
     public void deregisterInstance(String serviceName, String groupName, String ip, int port, String clusterName)
             throws NacosException {
+        // 构建一个实例信息
         Instance instance = new Instance();
         instance.setIp(ip);
         instance.setPort(port);

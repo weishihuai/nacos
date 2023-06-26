@@ -146,9 +146,13 @@ public class NamingGrpcRedoService implements ConnectionEventListener {
     public void instanceDeregister(String serviceName, String groupName) {
         String key = NamingUtils.getGroupedName(serviceName, groupName);
         synchronized (registeredInstances) {
+            // ConcurrentMap<String, InstanceRedoData> registeredInstances
+            // 从缓存中获取到对应的redo服务缓存
             InstanceRedoData redoData = registeredInstances.get(key);
             if (null != redoData) {
+                // 设置为true，表示缓存数据从Nacos服务端取消注册
                 redoData.setUnregistering(true);
+                // 预期的最终状态: false表示取消注册
                 redoData.setExpectedRegistered(false);
             }
         }
