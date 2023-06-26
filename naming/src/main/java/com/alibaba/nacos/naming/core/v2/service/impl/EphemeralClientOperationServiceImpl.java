@@ -54,7 +54,7 @@ public class EphemeralClientOperationServiceImpl implements ClientOperationServi
     
     @Override
     public void registerInstance(Service service, Instance instance, String clientId) throws NacosException {
-        // 实例活动状态检查  即实例需要满足：心跳超时时间 > 心跳间隔、IP 删除超时时间 > 心跳间隔
+        // 实例活动状态检查  即实例需要满足：心跳超时时间 > 心跳间隔、IP删除超时时间 > 心跳间隔
         NamingUtils.checkInstanceIsLegal(instance);
 
         // ServiceManager.getInstance()使用饿汉式单例返回一个ServiceManager对象
@@ -82,13 +82,10 @@ public class EphemeralClientOperationServiceImpl implements ClientOperationServi
         // 获取实例发布信息，包含一些属性，如实例IP、实例ID、端口号等等
         InstancePublishInfo instanceInfo = getPublishInfo(instance);
 
-        // 添加一个服务实例到发布列表中（publishers）
-        // key: Service     value: 实例发布信息
-
         /**
          * 1. 客户端将自己注册到了服务器端的ClientManager中；
          * 2. Client客户端内部有一个Map: ConcurrentHashMap<Service, InstancePublishInfo> publishers. 即发布者列表
-         * 3. 将实例信息放入发布者列表中
+         * 3. 将实例信息放入发布者列表中（ key: Service 、 value: 实例发布信息）
          */
 
         // com.alibaba.nacos.naming.core.v2.client.AbstractClient.publishers

@@ -360,7 +360,8 @@ public abstract class RpcClient implements Closeable {
                 
                 LoggerUtils.printIfInfoEnabled(LOGGER, "[{}] Try to connect to server on start up, server: {}",
                         rpcClientConfig.name(), serverInfo);
-                
+
+                // 拿到连接
                 connectToServer = connectToServer(serverInfo);
             } catch (Throwable e) {
                 LoggerUtils.printIfWarnEnabled(LOGGER,
@@ -369,11 +370,13 @@ public abstract class RpcClient implements Closeable {
             }
             
         }
-        
+
+        // 如果连接不为空
         if (connectToServer != null) {
             LoggerUtils.printIfInfoEnabled(LOGGER,
                     "[{}] Success to connect to server [{}] on start up, connectionId = {}", rpcClientConfig.name(),
                     connectToServer.serverInfo.getAddress(), connectToServer.getConnectionId());
+            // 对currentConnection赋值
             this.currentConnection = connectToServer;
             rpcClientStatus.set(RpcClientStatus.RUNNING);
             eventLinkedBlockingQueue.offer(new ConnectionEvent(ConnectionEvent.CONNECTED));
@@ -622,6 +625,7 @@ public abstract class RpcClient implements Closeable {
      * @return response from server.
      */
     public Response request(Request request) throws NacosException {
+        // 获取超时时间，如果没有配置，默认3s超时
         return request(request, rpcClientConfig.timeOutMills());
     }
     
@@ -632,10 +636,12 @@ public abstract class RpcClient implements Closeable {
      * @return response from server.
      */
     public Response request(Request request, long timeoutMills) throws NacosException {
+        // 重试次数
         int retryTimes = 0;
         Response response;
         Throwable exceptionThrow = null;
         long start = System.currentTimeMillis();
+        // 重试次数小于最大重试次数 && (超时时间小于等于0 || (当前时间 < 超时时间 + 开始时间))
         while (retryTimes < rpcClientConfig.retryTimes() && (timeoutMills <= 0 || System.currentTimeMillis() < timeoutMills + start)) {
             boolean waitReconnect = false;
             try {
@@ -644,6 +650,8 @@ public abstract class RpcClient implements Closeable {
                     throw new NacosException(NacosException.CLIENT_DISCONNECT,
                             "Client not connected, current status:" + rpcClientStatus.get());
                 }
+
+                // 拿到连接去请求
                 response = this.currentConnection.request(request, timeoutMills);
                 if (response == null) {
                     throw new NacosException(SERVER_ERROR, "Unknown Exception.");
@@ -684,6 +692,8 @@ public abstract class RpcClient implements Closeable {
                 exceptionThrow = e;
                 
             }
+
+            // 如果请求没成功，继续重试，将重试次数 + 1
             retryTimes++;
             
         }

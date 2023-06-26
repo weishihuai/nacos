@@ -45,6 +45,9 @@ import static com.alibaba.nacos.client.constant.Constants.Security.SECURITY_INFO
 import static com.alibaba.nacos.client.utils.LogUtils.NAMING_LOGGER;
 
 /**
+ * 代理委托类：这个类并不是真正的代理类，真正的代理类是grpcClientProxy和httpClientProxy，
+ * 这个类仅仅是做了一个委托功能，将处理的方法委托给了这两个代理类去处理。
+ *
  * Delegate of naming client proxy.
  *
  * @author xiweng.yy
@@ -74,6 +77,8 @@ public class NamingClientProxyDelegate implements NamingClientProxy {
         this.securityProxy = new SecurityProxy(this.serverListManager.getServerList(),
                 NamingHttpClientManager.getInstance().getNacosRestTemplate());
         initSecurityProxy(properties);
+
+        // 真正的代理类： httpClientProxy、grpcClientProxy
         this.httpClientProxy = new NamingHttpClientProxy(namespace, securityProxy, serverListManager, properties);
         this.grpcClientProxy = new NamingGrpcClientProxy(namespace, securityProxy, serverListManager, properties,
                 serviceInfoHolder);
@@ -95,6 +100,7 @@ public class NamingClientProxyDelegate implements NamingClientProxy {
     
     @Override
     public void registerService(String serviceName, String groupName, Instance instance) throws NacosException {
+        // 根据是否是临时实例，选择不同的代理类去注册   grpcClientProxy or  httpClientProxy
         getExecuteClientProxy(instance).registerService(serviceName, groupName, instance);
     }
     
@@ -195,6 +201,8 @@ public class NamingClientProxyDelegate implements NamingClientProxy {
     }
     
     private NamingClientProxy getExecuteClientProxy(Instance instance) {
+        // 如果是临时实例，使用grpc方式，否则使用http方式
+        // ephemeral默认为true,也就是返回grpcClientProxy,Nacos 2.0版本将http的请求换成了gRpc了
         return instance.isEphemeral() ? grpcClientProxy : httpClientProxy;
     }
     

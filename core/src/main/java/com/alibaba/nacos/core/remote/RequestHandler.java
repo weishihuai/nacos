@@ -60,6 +60,11 @@ public abstract class RequestHandler<T extends Request, S extends Response> {
     }
     
     /**
+     * 抽象方法，由子类处理。可以通过参数中的泛型，推导出具体是哪个处理类
+     *
+     * 例如：服务注册请求对象是：{@link com.alibaba.nacos.api.naming.remote.request.InstanceRequest}
+     * 那么对应的处理类就是：{@link com.alibaba.nacos.naming.remote.rpc.handler.InstanceRequestHandler#handle(com.alibaba.nacos.api.naming.remote.request.InstanceRequest, com.alibaba.nacos.api.remote.request.RequestMeta)}
+     *
      * Handler request.
      *
      * @param request request

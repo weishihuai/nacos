@@ -99,6 +99,8 @@ public class NacosNamingService implements NamingService {
         NotifyCenter.registerToPublisher(InstancesChangeEvent.class, 16384);
         NotifyCenter.registerSubscriber(changeNotifier);
         this.serviceInfoHolder = new ServiceInfoHolder(namespace, this.notifierEventScope, nacosClientProperties);
+
+        // 创建代理类
         this.clientProxy = new NamingClientProxyDelegate(this.namespace, serviceInfoHolder, nacosClientProperties, changeNotifier);
     }
     
@@ -124,6 +126,7 @@ public class NacosNamingService implements NamingService {
     @Override
     public void registerInstance(String serviceName, String groupName, String ip, int port, String clusterName)
             throws NacosException {
+        // 创建了一个Instance实例
         Instance instance = new Instance();
         instance.setIp(ip);
         instance.setPort(port);
@@ -139,7 +142,12 @@ public class NacosNamingService implements NamingService {
     
     @Override
     public void registerInstance(String serviceName, String groupName, Instance instance) throws NacosException {
+        // 检查instance相关属性的合法性
         NamingUtils.checkInstanceIsLegal(instance);
+
+        // 通过客户端代理去注册服务
+        // 在构造方法中调用了init()初始化方法，创建了一个clientProxy代理类对象，具体的实现是NamingClientProxyDelegate
+        // this.clientProxy = new NamingClientProxyDelegate(this.namespace, serviceInfoHolder, nacosClientProperties, changeNotifier);
         clientProxy.registerService(serviceName, groupName, instance);
     }
     

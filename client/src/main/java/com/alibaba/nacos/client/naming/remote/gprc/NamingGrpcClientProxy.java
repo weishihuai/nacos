@@ -100,6 +100,7 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
                 RpcClientTlsConfig.properties(properties.asProperties()));
         this.redoService = new NamingGrpcRedoService(this);
         NAMING_LOGGER.info("Create naming rpc client for uuid->{}", uuid);
+        // 拿到连接
         start(serverListFactory, serviceInfoHolder);
     }
     
@@ -107,6 +108,7 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
         rpcClient.serverListFactory(serverListFactory);
         rpcClient.registerConnectionListener(redoService);
         rpcClient.registerServerRequestHandler(new NamingPushRequestHandler(serviceInfoHolder));
+        // 拿到连接
         rpcClient.start();
         NotifyCenter.registerSubscriber(this);
     }
@@ -125,7 +127,11 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
     public void registerService(String serviceName, String groupName, Instance instance) throws NacosException {
         NAMING_LOGGER.info("[REGISTER-SERVICE] {} registering service {} with instance {}", namespaceId, serviceName,
                 instance);
+        // 将实例信息缓存到一个map中，后面需要使用
+        // ConcurrentMap<String, InstanceRedoData> registeredInstances
         redoService.cacheInstanceForRedo(serviceName, groupName, instance);
+
+        // 注册服务
         doRegisterService(serviceName, groupName, instance);
     }
     
@@ -210,9 +216,14 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
      * @throws NacosException nacos exception
      */
     public void doRegisterService(String serviceName, String groupName, Instance instance) throws NacosException {
+        // type=registerInstance
+
+        // 构建一个实例请求对象
         InstanceRequest request = new InstanceRequest(namespaceId, serviceName, groupName,
                 NamingRemoteConstants.REGISTER_INSTANCE, instance);
+        // 通过grpc方法进行远程服务调用，请求Nacos服务端注册
         requestToServer(request, Response.class);
+        // 标识InstanceRedoData注册状态为true
         redoService.instanceRegistered(serviceName, groupName);
     }
     
@@ -362,6 +373,7 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
         try {
             request.putAllHeader(
                     getSecurityHeaders(request.getNamespace(), request.getGroupName(), request.getServiceName()));
+            // 真正发起grpc调用
             Response response =
                     requestTimeout < 0 ? rpcClient.request(request) : rpcClient.request(request, requestTimeout);
             if (ResponseCode.SUCCESS.getCode() != response.getResultCode()) {

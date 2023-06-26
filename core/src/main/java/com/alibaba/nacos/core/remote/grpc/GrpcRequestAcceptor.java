@@ -162,8 +162,11 @@ public class GrpcRequestAcceptor extends RequestGrpc.RequestImplBase {
             requestMeta.setConnectionId(GrpcServerConstants.CONTEXT_KEY_CONN_ID.get());
             requestMeta.setClientVersion(connection.getMetaInfo().getVersion());
             requestMeta.setLabels(connection.getMetaInfo().getLabels());
+            // 刷新活跃时间，根据这个时间看是否超时的
             connectionManager.refreshActiveTime(requestMeta.getConnectionId());
+            // 真正处理请求
             Response response = requestHandler.handleRequest(request, requestMeta);
+            // 拿到请求解析，完成请求
             Payload payloadResponse = GrpcUtils.convert(response);
             traceIfNecessary(payloadResponse, false);
             responseObserver.onNext(payloadResponse);

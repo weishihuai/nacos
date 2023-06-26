@@ -27,6 +27,8 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 
 /**
+ * Grpc服务端的一个抽象类
+ *
  * abstract rpc server .
  *
  * @author liuzunfei
@@ -43,6 +45,7 @@ public abstract class BaseRpcServer {
     
     /**
      * Start sever.
+     * @PostConstruct: 在构造方法后执行
      */
     @PostConstruct
     public void start() throws Exception {
@@ -60,7 +63,7 @@ public abstract class BaseRpcServer {
         
         Loggers.REMOTE.info("Nacos {} Rpc server started at port {} and tls config:{}", serverName, getServicePort(),
                 tlsConfig);
-        // JVM关闭时,关闭Grpc服务
+        // 添加一个关闭的钩子函数，当虚拟机接受关闭退出信号的时候关闭服务，具体也就是关闭Grpc的服务端
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             Loggers.REMOTE.info("Nacos {} Rpc server stopping", serverName);
             try {
