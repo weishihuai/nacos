@@ -80,12 +80,14 @@ public class HealthCheckReactor {
     }
     
     /**
+     * 直接执行健康检查，无延迟
      * Schedule client beat check task without a delay.
      *
      * @param task health check task
      * @return scheduled future
      */
     public static ScheduledFuture<?> scheduleNow(Runnable task) {
+        // 通过线程池执行健康检查，将任务直接丢进去
         return GlobalExecutor.scheduleNamingHealth(task, 0, TimeUnit.MILLISECONDS);
     }
 }

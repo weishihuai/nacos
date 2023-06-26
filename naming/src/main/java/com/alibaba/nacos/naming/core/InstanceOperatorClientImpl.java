@@ -239,17 +239,27 @@ public class InstanceOperatorClientImpl implements InstanceOperator {
     @Override
     public int handleBeat(String namespaceId, String serviceName, String ip, int port, String cluster,
             RsInfo clientBeat, BeatInfoInstanceBuilder builder) throws NacosException {
+        // 获取服务信息
         Service service = getService(namespaceId, serviceName, true);
+        // 获取客户端ID
         String clientId = IpPortBasedClient.getClientId(ip + InternetAddressUtil.IP_PORT_SPLITER + port, true);
+        // 根据客户端ID信息从 clientManager 中获取注册的实例
         IpPortBasedClient client = (IpPortBasedClient) clientManager.getClient(clientId);
+        // 如果 client 为空或者发布者 publishers 信息集合里面没有该客户端实例那么就从新注册一个
         if (null == client || !client.getAllPublishedService().contains(service)) {
             if (null == clientBeat) {
+                // 如果心跳实体信息为空返回 20404，即请求未找到
                 return NamingResponseCode.RESOURCE_NOT_FOUND;
             }
             Instance instance = builder.setBeatInfo(clientBeat).setServiceName(serviceName).build();
+            // 发起服务实例注册
             registerInstance(namespaceId, serviceName, instance);
+            // 注册完后再一次从clientManager中获取 client，因为注册的时候就是把这个客户端放入到clientManager中去的
             client = (IpPortBasedClient) clientManager.getClient(clientId);
         }
+
+        // 注册时候已经将当前的 service放入到了 ServiceManager.getInstance()的singletonRepository这个ConcurrentHashMap中，
+        // 所以containSingleton正常肯定是要返回true的，否则抛出异常
         if (!ServiceManager.getInstance().containSingleton(service)) {
             throw new NacosException(NacosException.SERVER_ERROR,
                     "service not found: " + serviceName + "@" + namespaceId);
@@ -261,7 +271,9 @@ public class InstanceOperatorClientImpl implements InstanceOperator {
             clientBeat.setCluster(cluster);
             clientBeat.setServiceName(serviceName);
         }
+        // 创建心跳处理器任务。 实现了runnable接口
         ClientBeatProcessorV2 beatProcessor = new ClientBeatProcessorV2(namespaceId, clientBeat, client);
+        // 健康检查
         HealthCheckReactor.scheduleNow(beatProcessor);
         client.setLastUpdatedTime();
         return NamingResponseCode.OK;

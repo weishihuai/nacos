@@ -46,7 +46,10 @@ public class ClientBeatProcessorV2 implements BeatProcessor {
         this.rsInfo = rsInfo;
         this.client = ipPortBasedClient;
     }
-    
+
+    /**
+     * 处理心跳请求
+     */
     @Override
     public void run() {
         if (Loggers.EVT_LOG.isDebugEnabled()) {
@@ -57,12 +60,21 @@ public class ClientBeatProcessorV2 implements BeatProcessor {
         String serviceName = NamingUtils.getServiceName(rsInfo.getServiceName());
         String groupName = NamingUtils.getGroupName(rsInfo.getServiceName());
         Service service = Service.newService(namespace, groupName, serviceName, rsInfo.isEphemeral());
+        // 从发布者列表中获取到实例信息
         HealthCheckInstancePublishInfo instance = (HealthCheckInstancePublishInfo) client.getInstancePublishInfo(service);
+
+        // IP、端口对应上
         if (instance.getIp().equals(ip) && instance.getPort() == port) {
             if (Loggers.EVT_LOG.isDebugEnabled()) {
                 Loggers.EVT_LOG.debug("[CLIENT-BEAT] refresh beat: {}", rsInfo);
             }
+            // 更新一下实例的心跳时间
             instance.setLastHeartBeatTime(System.currentTimeMillis());
+
+            /**
+             * 1、如果实例是健康的那么就直接执行完任务，也就是对于正常实例，服务器端就只是更新了一下最近一次的心跳时间为当前时间
+             * 2、如果不是健康的那么就设置成健康的，之后发布服务改变事件和客户端改变事件
+             */
             if (!instance.isHealthy()) {
                 instance.setHealthy(true);
                 Loggers.EVT_LOG.info("service: {} {POS} {IP-ENABLED} valid: {}:{}@{}, region: {}, msg: client beat ok",
