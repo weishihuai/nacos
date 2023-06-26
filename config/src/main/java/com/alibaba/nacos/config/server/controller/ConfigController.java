@@ -206,6 +206,7 @@ public class ConfigController {
     }
     
     /**
+     * 获取配置信息
      * Get configure board information fail.
      *
      * @throws ServletException ServletException.
@@ -220,15 +221,19 @@ public class ConfigController {
             @RequestParam(value = "tenant", required = false, defaultValue = StringUtils.EMPTY) String tenant,
             @RequestParam(value = "tag", required = false) String tag)
             throws IOException, ServletException, NacosException {
+        // 校验参数
+
         // check tenant
         ParamUtils.checkTenant(tenant);
         tenant = NamespaceUtil.processNamespaceParameter(tenant);
         // check params
         ParamUtils.checkParam(dataId, group, "datumId", "content");
         ParamUtils.checkParam(tag);
-        
+
+        // 获取客户端请求IP地址
         final String clientIp = RequestUtil.getRemoteIp(request);
         String isNotify = request.getHeader("notify");
+        // 获取配置请求方法
         inner.doGetConfig(request, response, dataId, group, tenant, tag, isNotify, clientIp);
     }
     

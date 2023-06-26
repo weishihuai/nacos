@@ -835,7 +835,9 @@ public class ConfigCacheService {
      * @return 0 - No data and failed. Positive number - lock succeeded. Negative number - lock failed。
      */
     public static int tryReadLock(String groupKey) {
+        // 从缓存中获取值（groupKey -> cacheItem）
         CacheItem groupItem = CACHE.get(groupKey);
+        // 如果不为空的话那么尝试加读锁，如果为空那么就返回 0，意味着配置不存在
         int result = (null == groupItem) ? 0 : (groupItem.rwLock.tryReadLock() ? 1 : -1);
         if (result < 0) {
             DEFAULT_LOG.warn("[read-lock] failed, {}, {}", result, groupKey);

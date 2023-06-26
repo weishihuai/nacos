@@ -165,17 +165,21 @@ public class ConfigServletInner {
         String autoTag = request.getHeader(com.alibaba.nacos.api.common.Constants.VIPSERVER_TAG);
         
         String requestIpApp = RequestUtil.getAppName(request);
+        // 尝试添加读锁
         int lockResult = tryConfigReadLock(groupKey);
         
         final String requestIp = RequestUtil.getRemoteIp(request);
         boolean isBeta = false;
         boolean isSli = false;
+
+        // 获取读锁成功
         if (lockResult > 0) {
             // LockResult > 0 means cacheItem is not null and other thread can`t delete this cacheItem
             FileInputStream fis = null;
             try {
                 String md5 = Constants.NULL;
                 long lastModified = 0L;
+                // 根据 key 获取缓存中的配置信息
                 CacheItem cacheItem = ConfigCacheService.getContentCache(groupKey);
                 if (cacheItem.isBeta() && cacheItem.getConfigCacheBeta() != null && cacheItem.getIps4Beta() != null
                         && cacheItem.getIps4Beta().contains(clientIp)) {
@@ -204,6 +208,7 @@ public class ConfigServletInner {
                     lastModified = configCacheBeta.getLastModifiedTs();
                     
                     if (PropertyUtil.isDirectRead()) {
+                        // 根据 dataId ,group, tenant 从 Derby 嵌入式数据库中查询配置信息
                         configInfoBase = configInfoBetaPersistService.findConfigInfo4Beta(dataId, group, tenant);
                     } else {
                         content = ConfigDiskServiceFactory.getInstance().getBetaContent(dataId, group, tenant);
@@ -328,6 +333,7 @@ public class ConfigServletInner {
                 }
                 
             } finally {
+                // 不管成功与否，都需要释放读锁
                 releaseConfigReadLock(groupKey);
                 IoUtils.closeQuietly(fis);
             }
@@ -386,22 +392,24 @@ public class ConfigServletInner {
         
         // Lock failed by default.
         int lockResult = -1;
-        
+
+        // 尝试获取锁的次数，最大次数是10，TRY_GET_LOCK_TIMES = 9
         // Try to get lock times, max value: 10;
         for (int i = TRY_GET_LOCK_TIMES; i >= 0; --i) {
+            // 尝试加锁
             lockResult = ConfigCacheService.tryReadLock(groupKey);
             
-            // The data is non-existent.
+            // 数据不存在
             if (0 == lockResult) {
                 break;
             }
             
-            // Success
+            // 加锁成功
             if (lockResult > 0) {
                 break;
             }
             
-            // Retry.
+            // 休眠1毫秒后，进行重试
             if (i > 0) {
                 try {
                     Thread.sleep(1);
