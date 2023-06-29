@@ -30,7 +30,8 @@ import java.util.Collection;
  * @author xiweng.yy
  */
 public class NacosExecuteTaskExecuteEngine extends AbstractNacosTaskExecuteEngine<AbstractExecuteTask> {
-    
+
+    // 任务执行worker，在构造方法中进行创建和初始化
     private final TaskExecuteWorker[] executeWorkers;
     
     public NacosExecuteTaskExecuteEngine(String name, Logger logger) {
@@ -39,6 +40,7 @@ public class NacosExecuteTaskExecuteEngine extends AbstractNacosTaskExecuteEngin
     
     public NacosExecuteTaskExecuteEngine(String name, Logger logger, int dispatchWorkerCount) {
         super(logger);
+        // worker创建和初始化
         executeWorkers = new TaskExecuteWorker[dispatchWorkerCount];
         for (int mod = 0; mod < dispatchWorkerCount; ++mod) {
             executeWorkers[mod] = new TaskExecuteWorker(name, mod, dispatchWorkerCount, getEngineLog());
@@ -61,11 +63,14 @@ public class NacosExecuteTaskExecuteEngine extends AbstractNacosTaskExecuteEngin
     
     @Override
     public void addTask(Object tag, AbstractExecuteTask task) {
+        // 获取处理类
         NacosTaskProcessor processor = getProcessor(tag);
         if (null != processor) {
+            // 不为空，就用对应的processor处理
             processor.process(task);
             return;
         }
+        // 没有找到处理类的话, 就用公共的TaskExecuteWorker执行
         TaskExecuteWorker worker = getWorker(tag);
         worker.process(task);
     }

@@ -62,20 +62,23 @@ public class NotifyCenter {
     private static final EventPublisherFactory DEFAULT_PUBLISHER_FACTORY;
 
     /**
-     * 单例，整个进程共享这个实例，需要考虑并发问题
+     * 单例，整个进程共享这个实例，所有的内部变量归所有线程共享，需要考虑并发问题
      */
     private static final NotifyCenter INSTANCE = new NotifyCenter();
-    
+
+    /**
+     * 共享EventPublisher工厂
+     */
     private DefaultSharePublisher sharePublisher;
     
     private static Class<? extends EventPublisher> clazz;
     
     /**
-     * Publisher management container.
+     * 事件发布器管理容器
      */
     private final Map<String, EventPublisher> publisherMap = new ConcurrentHashMap<>(16);
 
-    // 静态代码块进行一些初始化工作
+    // 静态代码块进行一些初始化工作。当NotifyCenter类被加载时，静态代码块会被执行，且只会执行一次。
     static {
         // Internal ArrayBlockingQueue buffer size. For applications with high write throughput,
         // this value needs to be increased appropriately. default value is 16384
@@ -102,7 +105,8 @@ public class NotifyCenter {
             clazz = DefaultPublisher.class;
         }
 
-        // 创建一个发布工厂，主要是对生产者进行创建并初始化
+        // 创建一个EventPublisher的工厂，主要是对EventPublisher进行创建并初始化
+        // 这里是一个Lambda表达式，只是声明了一个回调函数，并不会马上执行内部逻辑
         DEFAULT_PUBLISHER_FACTORY = (cls, buffer) -> {
             try {
                 EventPublisher publisher = clazz.newInstance();
@@ -117,7 +121,7 @@ public class NotifyCenter {
         
         try {
 
-            // 共享的生产者
+            // 创建并初始化共享的生产者
             // Create and init DefaultSharePublisher instance.
             INSTANCE.sharePublisher = new DefaultSharePublisher();
             INSTANCE.sharePublisher.init(SlowEvent.class, shareBufferSize);
@@ -125,7 +129,8 @@ public class NotifyCenter {
         } catch (Throwable ex) {
             LOGGER.error("Service class newInstance has error : ", ex);
         }
-        
+
+        // JVM关闭的回调钩子
         ThreadUtils.addShutdownHook(NotifyCenter::shutdown);
     }
     
@@ -181,6 +186,7 @@ public class NotifyCenter {
      * @param consumer subscriber
      */
     public static void registerSubscriber(final Subscriber consumer) {
+        // 往工厂中注册订阅者
         registerSubscriber(consumer, DEFAULT_PUBLISHER_FACTORY);
     }
     
@@ -212,11 +218,12 @@ public class NotifyCenter {
             INSTANCE.sharePublisher.addSubscriber(consumer, subscribeType);
             return;
         }
-        
+        // 添加订阅者
         addSubscriber(consumer, subscribeType, factory);
     }
     
     /**
+     * 往生产中添加一个订阅者
      * Add a subscriber to publisher.
      *
      * @param consumer      subscriber instance.
@@ -234,8 +241,10 @@ public class NotifyCenter {
         EventPublisher publisher = INSTANCE.publisherMap.get(topic);
         // 将订阅者放入EventPublisher中
         if (publisher instanceof ShardedEventPublisher) {
+            // 共享事件发布器
             ((ShardedEventPublisher) publisher).addSubscriber(consumer, subscribeType);
         } else {
+            // DefaultPublisher
             publisher.addSubscriber(consumer);
         }
     }
@@ -299,6 +308,7 @@ public class NotifyCenter {
      */
     public static boolean publishEvent(final Event event) {
         try {
+            // event.getClass(): com.alibaba.nacos.naming.core.v2.event.client.ClientOperationEvent$ClientRegisterServiceEvent
             return publishEvent(event.getClass(), event);
         } catch (Throwable ex) {
             LOGGER.error("There was an exception to the message publishing : ", ex);
@@ -316,12 +326,16 @@ public class NotifyCenter {
         if (ClassUtils.isAssignableFrom(SlowEvent.class, eventType)) {
             return INSTANCE.sharePublisher.publish(event);
         }
-        
+
+        // topic = com.alibaba.nacos.naming.core.v2.event.client.ClientOperationEvent.ClientRegisterServiceEvent
         final String topic = ClassUtils.getCanonicalName(eventType);
 
         // 获取对应的EventPublisher进行发布，也就是通知订阅者去处理
+        // Map<String, EventPublisher> publisherMap = new ConcurrentHashMap<>(16)
+        // INSTANCE.publisherMap就是事件发布器管理容器
         EventPublisher publisher = INSTANCE.publisherMap.get(topic);
         if (publisher != null) {
+            // 调用publish()发布事件
             return publisher.publish(event);
         }
         if (event.isPluginEvent()) {

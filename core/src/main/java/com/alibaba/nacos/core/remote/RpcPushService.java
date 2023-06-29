@@ -49,9 +49,11 @@ public class RpcPushService {
      */
     public void pushWithCallback(String connectionId, ServerRequest request, PushCallBack requestCallBack,
             Executor executor) {
+        // 拿到客户端的连接
         Connection connection = connectionManager.getConnection(connectionId);
         if (connection != null) {
             try {
+                // 发送异步请求
                 connection.asyncRequest(request, new AbstractRequestCallBack(requestCallBack.getTimeout()) {
                     
                     @Override

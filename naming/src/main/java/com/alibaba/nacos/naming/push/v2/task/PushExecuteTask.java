@@ -56,25 +56,31 @@ public class PushExecuteTask extends AbstractExecuteTask {
     @Override
     public void run() {
         try {
+            // 生成推送所需要的数据。包括服务信息、服务元数据信息
             PushDataWrapper wrapper = generatePushData();
+            // 获取客户端管理类
             ClientManager clientManager = delayTaskEngine.getClientManager();
             // 获取所有客户端或指定的客户端
             for (String each : getTargetClientIds()) {
+                // 获取每个客户端
                 Client client = clientManager.getClient(each);
                 if (null == client) {
-                    // means this client has disconnect
+                    // 说明客户端已经断开连接
                     continue;
                 }
+                // 获取到这个服务的所有订阅者
                 Subscriber subscriber = client.getSubscriber(service);
                 // skip if null
                 if (subscriber == null) {
                     continue;
                 }
+                // 推送给客户端
                 delayTaskEngine.getPushExecutor().doPushWithCallback(each, subscriber, wrapper,
                         new ServicePushCallback(each, subscriber, wrapper.getOriginalData(), delayTask.isPushToAll()));
             }
         } catch (Exception e) {
             Loggers.PUSH.error("Push task for service" + service.getGroupedServiceName() + " execute failed ", e);
+            // 失败重推
             delayTaskEngine.addTask(service, new PushDelayTask(service, 1000L));
         }
     }

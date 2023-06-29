@@ -60,6 +60,7 @@ public class PushDelayTask extends AbstractDelayTask {
         }
         PushDelayTask oldTask = (PushDelayTask) task;
         if (isPushToAll() || oldTask.isPushToAll()) {
+            // 推送到所有客户端，无需特殊处理
             pushToAll = true;
             targetClients = null;
         } else {

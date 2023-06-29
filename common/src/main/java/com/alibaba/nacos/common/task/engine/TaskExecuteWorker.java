@@ -36,14 +36,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class TaskExecuteWorker implements NacosTaskProcessor, Closeable {
     
     /**
-     * Max task queue size 32768.
+     * 队列最大大小为32768
      */
     private static final int QUEUE_CAPACITY = 1 << 15;
     
     private final Logger log;
     
     private final String name;
-    
+
+    /**
+     * 阻塞队列, 类型为Runnable，说明存入的是一个线程
+     */
     private final BlockingQueue<Runnable> queue;
     
     private final AtomicBoolean closed;
@@ -56,10 +59,13 @@ public final class TaskExecuteWorker implements NacosTaskProcessor, Closeable {
     
     public TaskExecuteWorker(final String name, final int mod, final int total, final Logger logger) {
         this.name = name + "_" + mod + "%" + total;
+        // 阻塞队列
         this.queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         this.closed = new AtomicBoolean(false);
         this.log = null == logger ? LoggerFactory.getLogger(TaskExecuteWorker.class) : logger;
+        // 内部执行worker，实际上是一个线程
         realWorker = new InnerWorker(this.name);
+        // 启动worker
         realWorker.start();
     }
     
@@ -70,6 +76,7 @@ public final class TaskExecuteWorker implements NacosTaskProcessor, Closeable {
     @Override
     public boolean process(NacosTask task) {
         if (task instanceof AbstractExecuteTask) {
+            // 添加任务到阻塞队列中
             putTask((Runnable) task);
         }
         return true;
@@ -115,8 +122,10 @@ public final class TaskExecuteWorker implements NacosTaskProcessor, Closeable {
         public void run() {
             while (!closed.get()) {
                 try {
+                    // 从阻塞队列获取任务，在process()方法中通过putTask()将任务存入到了阻塞队列中
                     Runnable task = queue.take();
                     long begin = System.currentTimeMillis();
+                    // 执行任务
                     task.run();
                     long duration = System.currentTimeMillis() - begin;
                     if (duration > 1000L) {

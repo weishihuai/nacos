@@ -21,7 +21,7 @@ import com.alibaba.nacos.common.task.engine.NacosExecuteTaskExecuteEngine;
 import com.alibaba.nacos.sys.env.EnvUtil;
 
 /**
- * Naming execute task dispatcher.
+ * 执行任务分配器
  *
  * @author xiweng.yy
  */
@@ -32,6 +32,7 @@ public class NamingExecuteTaskDispatcher {
     private final NacosExecuteTaskExecuteEngine executeEngine;
     
     private NamingExecuteTaskDispatcher() {
+        // 初始化任务执行引擎：NacosExecuteTaskExecuteEngine
         executeEngine = new NacosExecuteTaskExecuteEngine(EnvUtil.FUNCTION_MODE_NAMING, Loggers.SRV_LOG);
     }
     
@@ -40,6 +41,7 @@ public class NamingExecuteTaskDispatcher {
     }
     
     public void dispatchAndExecuteTask(Object dispatchTag, AbstractExecuteTask task) {
+        // 往任务引擎添加任务
         executeEngine.addTask(dispatchTag, task);
     }
     

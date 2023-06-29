@@ -24,7 +24,7 @@ package com.alibaba.nacos.common.task;
 public interface NacosTask {
     
     /**
-     * Judge Whether this nacos task should do.
+     * 判断任务是否应该执行
      *
      * @return true means the nacos task should be done, otherwise false
      */

@@ -41,7 +41,10 @@ public class NamingEventPublisher extends Thread implements ShardedEventPublishe
     private static final String THREAD_NAME = "naming.publisher-";
     
     private static final int DEFAULT_WAIT_TIME = 60;
-    
+
+    /**
+     * 订阅者列表
+     */
     private final Map<Class<? extends Event>, Set<Subscriber<? extends Event>>> subscribes = new ConcurrentHashMap<>();
     
     private volatile boolean initialized = false;
@@ -60,6 +63,7 @@ public class NamingEventPublisher extends Thread implements ShardedEventPublishe
         this.queue = new ArrayBlockingQueue<>(bufferSize);
         this.publisherName = type.getSimpleName();
         super.setName(THREAD_NAME + this.publisherName);
+        // 设置为守护线程，后台执行
         super.setDaemon(true);
         super.start();
         initialized = true;
@@ -96,8 +100,11 @@ public class NamingEventPublisher extends Thread implements ShardedEventPublishe
     
     @Override
     public boolean publish(Event event) {
+        // 校验publisher是否初始化
         checkIsStart();
+        // 将事件存入阻塞队列中，这样订阅者就可以从队列中取出任务执行
         boolean success = this.queue.offer(event);
+        // 如果存入队列失败，则直接通知订阅者处理事件
         if (!success) {
             Loggers.EVT_LOG.warn("Unable to plug in due to interruption, synchronize sending time, event : {}", event);
             handleEvent(event);
@@ -110,12 +117,15 @@ public class NamingEventPublisher extends Thread implements ShardedEventPublishe
         if (Loggers.EVT_LOG.isDebugEnabled()) {
             Loggers.EVT_LOG.debug("[NotifyCenter] the {} will received by {}", event, subscriber);
         }
+        // 允许订阅者支持同步还是异步方式处理
         final Runnable job = () -> subscriber.onEvent(event);
         final Executor executor = subscriber.executor();
         if (executor != null) {
+            // 线程池异步执行
             executor.execute(job);
         } else {
             try {
+                // 同步执行
                 job.run();
             } catch (Throwable e) {
                 Loggers.EVT_LOG.error("Event callback exception: ", e);
@@ -154,6 +164,7 @@ public class NamingEventPublisher extends Thread implements ShardedEventPublishe
     private void handleEvents() {
         while (!shutdown) {
             try {
+                // 从阻塞队列中取出事件
                 final Event event = queue.take();
                 handleEvent(event);
             } catch (InterruptedException e) {
@@ -165,7 +176,9 @@ public class NamingEventPublisher extends Thread implements ShardedEventPublishe
     }
     
     private void handleEvent(Event event) {
+        // 获取事件类型
         Class<? extends Event> eventType = event.getClass();
+        // 获取到订阅这个事件的所有订阅者
         Set<Subscriber<? extends Event>> subscribers = subscribes.get(eventType);
         if (null == subscribers) {
             if (Loggers.EVT_LOG.isDebugEnabled()) {
@@ -174,6 +187,7 @@ public class NamingEventPublisher extends Thread implements ShardedEventPublishe
             return;
         }
         for (Subscriber subscriber : subscribers) {
+            // 挨个通知每个事件订阅者
             notifySubscriber(subscriber, event);
         }
     }

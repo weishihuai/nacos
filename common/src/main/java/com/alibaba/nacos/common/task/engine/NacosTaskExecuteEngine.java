@@ -30,21 +30,21 @@ import java.util.Collection;
 public interface NacosTaskExecuteEngine<T extends NacosTask> extends Closeable {
     
     /**
-     * Get Task size in execute engine.
+     * 获取任务大小
      *
      * @return size of task
      */
     int size();
     
     /**
-     * Whether the execute engine is empty.
+     * 判断任务引擎是否没有任务执行
      *
      * @return true if the execute engine has no task to do, otherwise false
      */
     boolean isEmpty();
     
     /**
-     * Add task processor {@link NacosTaskProcessor} for execute engine.
+     * 往任务引擎中添加处理类
      *
      * @param key           key of task
      * @param taskProcessor task processor
@@ -52,14 +52,14 @@ public interface NacosTaskExecuteEngine<T extends NacosTask> extends Closeable {
     void addProcessor(Object key, NacosTaskProcessor taskProcessor);
     
     /**
-     * Remove task processor {@link NacosTaskProcessor} form execute engine for key.
+     * 从任务引擎中删除处理类
      *
      * @param key key of task
      */
     void removeProcessor(Object key);
     
     /**
-     * Try to get {@link NacosTaskProcessor} by key, if non-exist, will return default processor.
+     * 从任务引擎中找到合适的处理类，没有找到的话，将使用默认的处理类
      *
      * @param key key of task
      * @return task processor for task key or default processor if task processor for task key non-exist
@@ -67,14 +67,14 @@ public interface NacosTaskExecuteEngine<T extends NacosTask> extends Closeable {
     NacosTaskProcessor getProcessor(Object key);
     
     /**
-     * Get all processor key.
+     * 获取所有的处理类key
      *
      * @return collection of processors
      */
     Collection<Object> getAllProcessorKey();
     
     /**
-     * Set default task processor. If do not find task processor by task key, use this default processor to process
+     * 设置默认的处理类
      * task.
      *
      * @param defaultTaskProcessor default task processor
@@ -82,7 +82,7 @@ public interface NacosTaskExecuteEngine<T extends NacosTask> extends Closeable {
     void setDefaultTaskProcessor(NacosTaskProcessor defaultTaskProcessor);
     
     /**
-     * Add task into execute pool.
+     * 往引擎中添加任务
      *
      * @param key  key of task
      * @param task task
@@ -90,7 +90,7 @@ public interface NacosTaskExecuteEngine<T extends NacosTask> extends Closeable {
     void addTask(Object key, T task);
     
     /**
-     * Remove task.
+     * 从引擎中删除任务
      *
      * @param key key of task
      * @return nacos task
@@ -98,7 +98,7 @@ public interface NacosTaskExecuteEngine<T extends NacosTask> extends Closeable {
     T removeTask(Object key);
     
     /**
-     * Get all task keys.
+     * 获取所有的任务Key
      *
      * @return collection of task keys.
      */

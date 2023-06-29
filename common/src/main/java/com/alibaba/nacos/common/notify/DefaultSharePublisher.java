@@ -34,7 +34,7 @@ public class DefaultSharePublisher extends DefaultPublisher implements ShardedEv
 
     /**
      * key是SlowEvent, value是Set<Subscriber>
-     * 每一种事件，一个Set，共享同一个DefaultPublisher，处理比较耗时的一些事件
+     * 每一种事件，一个Set，共享同一个DefaultSharePublisher，处理比较耗时的一些事件（SlowEvent事件类型）
      */
     private final Map<Class<? extends SlowEvent>, Set<Subscriber>> subMappings = new ConcurrentHashMap<>();
     

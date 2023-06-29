@@ -91,8 +91,10 @@ public class ClientServiceIndexesManager extends SmartSubscriber {
     @Override
     public void onEvent(Event event) {
         if (event instanceof ClientOperationEvent.ClientReleaseEvent) {
+            // 处理客户端断开连接事件
             handleClientDisconnect((ClientOperationEvent.ClientReleaseEvent) event);
         } else if (event instanceof ClientOperationEvent) {
+            // 处理排除ClientReleaseEvent后的其它客户端操作事件
             handleClientOperation((ClientOperationEvent) event);
         }
     }
@@ -115,25 +117,31 @@ public class ClientServiceIndexesManager extends SmartSubscriber {
     }
     
     private void handleClientOperation(ClientOperationEvent event) {
+        // 获取服务
         Service service = event.getService();
+        // 获取客户端ID
         String clientId = event.getClientId();
         if (event instanceof ClientOperationEvent.ClientRegisterServiceEvent) {
-            // 处理ClientRegisterServiceEvent事件
+            // 处理ClientRegisterServiceEvent事件（服务注册）
             addPublisherIndexes(service, clientId);
         } else if (event instanceof ClientOperationEvent.ClientDeregisterServiceEvent) {
+            // 处理ClientDeregisterServiceEvent事件（服务下线）
             removePublisherIndexes(service, clientId);
         } else if (event instanceof ClientOperationEvent.ClientSubscribeServiceEvent) {
+            // 处理ClientSubscribeServiceEvent事件（订阅）
             addSubscriberIndexes(service, clientId);
         } else if (event instanceof ClientOperationEvent.ClientUnsubscribeServiceEvent) {
+            // 处理ClientUnsubscribeServiceEvent事件（取消订阅）
             removeSubscriberIndexes(service, clientId);
         }
     }
     
     private void addPublisherIndexes(Service service, String clientId) {
-        // 添加注册服务的client
+        // 将客户端添加到注册服务中
+        // ConcurrentMap<Service, Set<String>> publisherIndexes
         publisherIndexes.computeIfAbsent(service, key -> new ConcurrentHashSet<>());
         publisherIndexes.get(service).add(clientId);
-        // 发布服务变更事件
+        // 发布服务变更事件，这样其它客户端才能及时知道service这个服务可用了
         NotifyCenter.publishEvent(new ServiceEvent.ServiceChangedEvent(service, true));
     }
     

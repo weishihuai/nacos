@@ -63,8 +63,10 @@ public class NamingSubscriberServiceV2Impl extends SmartSubscriber implements Na
             NamingMetadataManager metadataManager, PushExecutorDelegate pushExecutor, SwitchDomain switchDomain) {
         this.clientManager = clientManager;
         this.indexesManager = indexesManager;
+        // 初始化任务引擎
         this.delayTaskEngine = new PushDelayTaskExecuteEngine(clientManager, indexesManager, serviceStorage,
                 metadataManager, pushExecutor, switchDomain);
+        // 往NotifyCenter中注册自己
         NotifyCenter.registerSubscriber(this, NamingEventPublisherFactory.getInstance());
         
     }
@@ -113,18 +115,19 @@ public class NamingSubscriberServiceV2Impl extends SmartSubscriber implements Na
     
     @Override
     public void onEvent(Event event) {
+        /**
+         * 1.服务变更事件，推送这个变更给所有的订阅者
+         * 2.如果服务被某个客户端订阅了，那么只会推送这个变更给这个客户端
+         */
         if (event instanceof ServiceEvent.ServiceChangedEvent) {
-            // If service changed, push to all subscribers.
-
             // 服务变更时，向所有客户端推送
             ServiceEvent.ServiceChangedEvent serviceChangedEvent = (ServiceEvent.ServiceChangedEvent) event;
             // 获取Service服务信息
             Service service = serviceChangedEvent.getService();
-            // 添加延时任务到延时任务调度引擎，最终执行 PushDelayTaskProcessor.process
+            // 将service信息包装成一个PushDelayTask，添加到延时任务调度引擎，最终实际会执行PushDelayTaskProcessor.process()方法
             delayTaskEngine.addTask(service, new PushDelayTask(service, PushConfig.getInstance().getPushTaskDelay()));
             MetricsMonitor.incrementServiceChangeCount(service.getNamespace(), service.getGroup(), service.getName());
         } else if (event instanceof ServiceEvent.ServiceSubscribedEvent) {
-            // If service is subscribed by one client, only push this client.
             ServiceEvent.ServiceSubscribedEvent subscribedEvent = (ServiceEvent.ServiceSubscribedEvent) event;
             Service service = subscribedEvent.getService();
             delayTaskEngine.addTask(service, new PushDelayTask(service, PushConfig.getInstance().getPushTaskDelay(),

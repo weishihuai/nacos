@@ -25,7 +25,7 @@ package com.alibaba.nacos.common.task;
 public abstract class AbstractDelayTask implements NacosTask {
     
     /**
-     * Task time interval between twice processing, unit is millisecond.
+     * 两次任务执行的间隔时间，单位毫秒
      */
     private long taskInterval;
     
@@ -40,7 +40,7 @@ public abstract class AbstractDelayTask implements NacosTask {
     protected static final long INTERVAL = 1000L;
     
     /**
-     * merge task.
+     * 抽象方法，由子类判断添加的任务是否可以合并
      *
      * @param task task
      */
@@ -64,6 +64,7 @@ public abstract class AbstractDelayTask implements NacosTask {
     
     @Override
     public boolean shouldProcess() {
+        // 延迟机制的判断：如果当前时间减去上次时间需大于等于任务执行的间隔时间，才会执行
         return (System.currentTimeMillis() - this.lastProcessTime >= this.taskInterval);
     }
     

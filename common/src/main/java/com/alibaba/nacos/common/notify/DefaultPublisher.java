@@ -38,15 +38,21 @@ import static com.alibaba.nacos.common.notify.NotifyCenter.ringBufferSize;
  * @author <a href="mailto:liaochuntao@live.com">liaochuntao</a>
  * @author zongtanghu
  *
- * DefaultPublisher是一个后台线程，内部包含一个阻塞队列，一直在等待事件的来到。当事件到来后，立马去通知订阅了这个事件的消费者去进行消费。
+ * DefaultPublisher继承Thread类，它是一个后台线程，内部包含一个阻塞队列，一直在等待事件的来到。当事件到来后，立马去通知订阅了这个事件的消费者去进行消费。
  * 每一个DefaultPublisher是一个线程，处理的是某一类的事件，去通知对这一类事件感兴趣的订阅者。
  */
 public class DefaultPublisher extends Thread implements EventPublisher {
     
     protected static final Logger LOGGER = LoggerFactory.getLogger(NotifyCenter.class);
-    
+
+    /**
+     * 标识事件发布者是否初始化的状态位
+     */
     private volatile boolean initialized = false;
-    
+
+    /**
+     * 标识事件发布者是否关闭的状态位
+     */
     private volatile boolean shutdown = false;
 
     /**
@@ -55,7 +61,7 @@ public class DefaultPublisher extends Thread implements EventPublisher {
     private Class<? extends Event> eventType;
 
     /**
-     * 事件的订阅者
+     * 监听这种事件的订阅者集合
      */
     protected final ConcurrentHashSet<Subscriber> subscribers = new ConcurrentHashSet<>();
 
@@ -102,7 +108,7 @@ public class DefaultPublisher extends Thread implements EventPublisher {
     
     @Override
     public synchronized void start() {
-        // initialized变量使用volatile修饰，保证可见性
+        // initialized变量使用volatile修饰，保证可见性，其它线程能及时发现initialized已经被改为true
         if (!initialized) {
             // start just called once
             // 保证只启动一次，调用父类，告诉JVM去进行线程启动
@@ -117,6 +123,7 @@ public class DefaultPublisher extends Thread implements EventPublisher {
     
     @Override
     public long currentEventSize() {
+        // 当前事件的多少其实就是阻塞队列的大小
         return queue.size();
     }
     
@@ -143,7 +150,7 @@ public class DefaultPublisher extends Thread implements EventPublisher {
             while (!shutdown) {
                 // 阻塞队列中如果没有事件，这里进行阻塞
                 final Event event = queue.take();
-                // 获取到事件进行处理
+                // 获取到事件进行处理. 当阻塞队列中有数据的时候，就会立马触发获取到队列元素，开始处理。
                 receiveEvent(event);
                 UPDATER.compareAndSet(this, lastEventSequence, Math.max(lastEventSequence, event.sequence()));
             }
@@ -165,13 +172,13 @@ public class DefaultPublisher extends Thread implements EventPublisher {
     public void removeSubscriber(Subscriber subscriber) {
         subscribers.remove(subscriber);
     }
-    
+
     @Override
     public boolean publish(Event event) {
         // 检查publisher是否启动，启动过之后，initialized就被置为true了
         checkIsStart();
 
-        // 将事件存入到阻塞队列中
+        // 将事件存入到阻塞队列中，这样订阅者那边监听到队列有事件需要处理了，将会立马进行处理
         boolean success = this.queue.offer(event);
         if (!success) {
             LOGGER.warn("Unable to plug in due to interruption, synchronize sending time, event : {}", event);
@@ -220,7 +227,7 @@ public class DefaultPublisher extends Thread implements EventPublisher {
                 continue;
             }
             
-            // Whether to ignore expiration events
+            // 是否忽略过期的事件
             if (subscriber.ignoreExpireEvent() && lastEventSequence > currentEventSequence) {
                 LOGGER.debug("[NotifyCenter] the {} is unacceptable to this subscriber, because had expire",
                         event.getClass());
@@ -240,11 +247,11 @@ public class DefaultPublisher extends Thread implements EventPublisher {
 
         // 包装成一个任务去处理事件
         final Runnable job = () -> subscriber.onEvent(event);
-        // 支持配置线程池，让每个订阅者决定是同步调用还是异步调用
+        // 支持配置线程池，很灵活，让每个订阅者决定是同步调用还是异步调用
         final Executor executor = subscriber.executor();
         
         if (executor != null) {
-            // 有线程池，将Runable放入线程池，等待异步执行
+            // 如果订阅者指定了线程池，将Runnable放入线程池，等待异步执行
             executor.execute(job);
         } else {
             try {
