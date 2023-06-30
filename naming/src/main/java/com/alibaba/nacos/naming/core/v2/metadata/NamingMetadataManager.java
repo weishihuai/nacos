@@ -42,7 +42,10 @@ import java.util.concurrent.ConcurrentMap;
  */
 @Component
 public class NamingMetadataManager extends SmartSubscriber {
-    
+
+    /**
+     * 过期元数据集合
+     */
     private final Set<ExpiredMetadataInfo> expiredMetadataInfos;
     
     private ConcurrentMap<Service, ServiceMetadata> serviceMetadataMap;
@@ -226,10 +229,13 @@ public class NamingMetadataManager extends SmartSubscriber {
     @Override
     public void onEvent(Event event) {
         if (event instanceof MetadataEvent.InstanceMetadataEvent) {
+            // 处理实例元数据事件
             handleInstanceMetadataEvent((MetadataEvent.InstanceMetadataEvent) event);
         } else if (event instanceof MetadataEvent.ServiceMetadataEvent) {
+            // 处理服务元数据事件
             handleServiceMetadataEvent((MetadataEvent.ServiceMetadataEvent) event);
         } else {
+            // 处理客户端断开连接事件
             handleClientDisconnectEvent((ClientEvent.ClientDisconnectEvent) event);
         }
     }
@@ -238,6 +244,7 @@ public class NamingMetadataManager extends SmartSubscriber {
         for (Service each : event.getClient().getAllPublishedService()) {
             String metadataId = event.getClient().getInstancePublishInfo(each).getMetadataId();
             if (containInstanceMetadata(each, metadataId)) {
+                // 实例已过期，将实例元数据添加到过期集合中
                 updateExpiredInfo(true, ExpiredMetadataInfo.newExpiredInstanceMetadata(each, metadataId));
             }
         }
@@ -253,13 +260,17 @@ public class NamingMetadataManager extends SmartSubscriber {
     private void handleInstanceMetadataEvent(MetadataEvent.InstanceMetadataEvent event) {
         Service service = event.getService();
         String metadataId = event.getMetadataId();
+        // ConcurrentMap<Service, ConcurrentMap<String, InstanceMetadata>> instanceMetadataMap = new ConcurrentHashMap<>(1 << 10);
+        // 判断实例元数据是否在map中（ConcurrentMap<服务实例, ConcurrentMap<元数据ID, 实例元数据>>）
         if (containInstanceMetadata(service, metadataId)) {
+            // 存在的话，更新过期信息
             updateExpiredInfo(event.isExpired(),
                     ExpiredMetadataInfo.newExpiredInstanceMetadata(event.getService(), event.getMetadataId()));
         }
     }
     
     private void updateExpiredInfo(boolean expired, ExpiredMetadataInfo expiredMetadataInfo) {
+        // 如果实例未过期，将实例元数据从过期集合中移除；如果实例已过期，将实例元数据添加到过期集合中
         if (expired) {
             expiredMetadataInfos.add(expiredMetadataInfo);
         } else {

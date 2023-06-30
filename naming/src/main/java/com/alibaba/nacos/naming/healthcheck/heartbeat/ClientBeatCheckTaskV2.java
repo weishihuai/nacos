@@ -29,7 +29,7 @@ import com.alibaba.nacos.sys.utils.ApplicationUtils;
 import java.util.Collection;
 
 /**
- * Client beat check task of service for version 2.x.
+ * 客户端心跳检查任务
  *
  * @author nkorange
  */

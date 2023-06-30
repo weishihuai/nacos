@@ -56,6 +56,8 @@ public class RedoScheduledTask extends AbstractExecuteTask {
     }
     
     private void redoForInstances() {
+        // 从ConcurrentMap<String, InstanceRedoData> registeredInstances中拿到所有需要重做的实例数据
+        // 在注册实例的时候存入：NamingGrpcRedoService.cacheInstanceForRedo()
         for (InstanceRedoData each : redoService.findInstanceRedoData()) {
             try {
                 redoForInstance(each);

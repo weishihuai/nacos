@@ -63,7 +63,9 @@ public class NamingGrpcRedoService implements ConnectionEventListener {
     private volatile boolean connected = false;
     
     public NamingGrpcRedoService(NamingGrpcClientProxy clientProxy) {
+        // 创建一个定时执行的线程池  核心线程数为1
         this.redoExecutor = new ScheduledThreadPoolExecutor(REDO_THREAD, new NameThreadFactory(REDO_THREAD_NAME));
+        // 首次执行延迟3秒，后面周期性3秒执行一次
         this.redoExecutor.scheduleWithFixedDelay(new RedoScheduledTask(clientProxy, this), DEFAULT_REDO_DELAY,
                 DEFAULT_REDO_DELAY, TimeUnit.MILLISECONDS);
     }
@@ -100,8 +102,12 @@ public class NamingGrpcRedoService implements ConnectionEventListener {
      */
     public void cacheInstanceForRedo(String serviceName, String groupName, Instance instance) {
         String key = NamingUtils.getGroupedName(serviceName, groupName);
+        // 缓存重做数据，定时使用redoData重新注册，代码在RedoScheduledTask(定时调用)，最终调用的也是NamingGrpcClientProxy#doRegisterService
         InstanceRedoData redoData = InstanceRedoData.build(serviceName, groupName, instance);
         synchronized (registeredInstances) {
+            // 缓存重做数据
+            // ConcurrentMap<String, InstanceRedoData> registeredInstances = new ConcurrentHashMap<>();
+            // key: groupName@@serviceName
             registeredInstances.put(key, redoData);
         }
     }

@@ -57,7 +57,12 @@ public class ConnectionManager {
     private static final Logger LOGGER = com.alibaba.nacos.plugin.control.Loggers.CONNECTION;
     
     private Map<String, AtomicInteger> connectionForClientIp = new ConcurrentHashMap<>(16);
-    
+
+    /**
+     * 连接集合
+     * key: ConnectionId
+     * value: Connection
+     */
     Map<String, Connection> connections = new ConcurrentHashMap<>();
     
     private RuntimeConnectionEjector runtimeConnectionEjector;
@@ -141,12 +146,15 @@ public class ConnectionManager {
     }
     
     /**
-     * unregister a connection .
+     * 注销连接
      *
      * @param connectionId connectionId.
      */
     public synchronized void unregister(String connectionId) {
+        // 根据connectionId从连接集合中移除这个连接
+        // Map<String, Connection> connections = new ConcurrentHashMap<>();
         Connection remove = this.connections.remove(connectionId);
+        // 移除成功
         if (remove != null) {
             String clientIp = remove.getMetaInfo().clientIp;
             AtomicInteger atomicInteger = connectionForClientIp.get(clientIp);
@@ -158,6 +166,8 @@ public class ConnectionManager {
             }
             remove.close();
             LOGGER.info("[{}]Connection unregistered successfully. ", connectionId);
+
+            // 通知其它客户端，这个连接断开了
             clientConnectionEventListenerRegistry.notifyClientDisConnected(remove);
         }
     }
@@ -240,14 +250,16 @@ public class ConnectionManager {
     }
     
     /**
+     * 应用启动的时候执行，首次执行延迟1s，运行中周期为3秒执行一次
      * Start Task：Expel the connection which active Time expire.
      */
     @PostConstruct
     public void start() {
-        
+        // 初始化runtimeConnectionEjector为NacosRuntimeConnectionEjector
         initConnectionEjector();
-        // Start UnHealthy Connection Expel Task.
+        // 开始执行不健康连接的剔除任务
         RpcScheduledExecutor.COMMON_SERVER_EXECUTOR.scheduleWithFixedDelay(() -> {
+            // 调用com.alibaba.nacos.core.remote.NacosRuntimeConnectionEjector.doEject
             runtimeConnectionEjector.doEject();
         }, 1000L, 3000L, TimeUnit.MILLISECONDS);
         

@@ -59,7 +59,8 @@ public class ClientConnectionEventListenerRegistry {
      * @param connection connection that disconnected.
      */
     public void notifyClientDisConnected(final Connection connection) {
-        
+
+        // ClientConnectionEventListener其实就是客户端连接事件的一些监听器
         for (ClientConnectionEventListener clientConnectionEventListener : clientConnectionEventListeners) {
             try {
                 clientConnectionEventListener.clientDisConnected(connection);

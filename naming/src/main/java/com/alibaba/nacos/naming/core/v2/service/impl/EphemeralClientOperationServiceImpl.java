@@ -58,7 +58,7 @@ public class EphemeralClientOperationServiceImpl implements ClientOperationServi
         NamingUtils.checkInstanceIsLegal(instance);
 
         // ServiceManager.getInstance()使用饿汉式单例返回一个ServiceManager对象
-        // getSingleton从缓存singletonRepository中获取一个单例Service
+        // getSingleton从缓存singletonRepository中获取一个单例Service, 已存在的时候直接从缓存获取
         Service singleton = ServiceManager.getInstance().getSingleton(service);
 
         // 判断获取到的service是否是临时实例，如果不是，则报错，因为当前的service（EphemeralClientOperationServiceImpl）就是处理临时实例的

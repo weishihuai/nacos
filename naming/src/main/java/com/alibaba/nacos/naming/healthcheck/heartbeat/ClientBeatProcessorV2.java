@@ -76,9 +76,12 @@ public class ClientBeatProcessorV2 implements BeatProcessor {
              * 2、如果不是健康的那么就设置成健康的，之后发布服务改变事件和客户端改变事件
              */
             if (!instance.isHealthy()) {
+                // 更新当前实例为健康实例
                 instance.setHealthy(true);
                 Loggers.EVT_LOG.info("service: {} {POS} {IP-ENABLED} valid: {}:{}@{}, region: {}, msg: client beat ok",
                         rsInfo.getServiceName(), ip, port, rsInfo.getCluster(), UtilsAndCommons.LOCALHOST_SITE);
+
+                // 发布服务改变事件和客户端改变事件
                 NotifyCenter.publishEvent(new ServiceEvent.ServiceChangedEvent(service));
                 NotifyCenter.publishEvent(new ClientEvent.ClientChangedEvent(client));
                 NotifyCenter.publishEvent(new HealthStateChangeTraceEvent(System.currentTimeMillis(),

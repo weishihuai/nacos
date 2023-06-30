@@ -368,7 +368,7 @@ public class InstanceController {
     }
     
     /**
-     * 服务端处理客户端定时发送的心跳信息
+     * 服务端处理客户端定时发送的心跳信息（服务续约）
      *
      * Create a beat for instance.
      *
@@ -382,21 +382,23 @@ public class InstanceController {
     public ObjectNode beat(HttpServletRequest request) throws Exception {
         
         ObjectNode result = JacksonUtils.createEmptyJsonNode();
-        // 5s 发送一次心跳
+        // 设置客户端下一次的心跳间隔时间，默认5s
         // private long clientBeatInterval = TimeUnit.SECONDS.toMillis(5);
         result.put(SwitchEntry.CLIENT_BEAT_INTERVAL, switchDomain.getClientBeatInterval());
-        // 解析的心跳信息
+        // 从请求中解析的心跳信息
         String beat = WebUtils.optional(request, "beat", StringUtils.EMPTY);
         RsInfo clientBeat = null;
+        // 如果beat数据不等于空，判断是否是注册心跳
         if (StringUtils.isNotBlank(beat)) {
+            // 字符串转对象
             clientBeat = JacksonUtils.toObj(beat, RsInfo.class);
         }
-        // 集群名称（default）
+        // 获取集群名称（default）
         String clusterName = WebUtils
                 .optional(request, CommonParams.CLUSTER_NAME, UtilsAndCommons.DEFAULT_CLUSTER_NAME);
-        // 服务实例IP
+        // 获取IP
         String ip = WebUtils.optional(request, "ip", StringUtils.EMPTY);
-        // 服务实例端口
+        // 获取端口
         int port = Integer.parseInt(WebUtils.optional(request, "port", "0"));
         if (clientBeat != null) {
             if (StringUtils.isNotBlank(clientBeat.getCluster())) {
@@ -408,10 +410,11 @@ public class InstanceController {
             ip = clientBeat.getIp();
             port = clientBeat.getPort();
         }
-        // 命名空间 （public）
+        // 获取命名空间 （public）
         String namespaceId = WebUtils.optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
-        // 服务名称
+        // 获取服务名称
         String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
+        // 校验服务名是否合法
         NamingUtils.checkServiceNameFormat(serviceName);
         Loggers.SRV_LOG.debug("[CLIENT-BEAT] full arguments: beat: {}, serviceName: {}, namespaceId: {}", clientBeat,
                 serviceName, namespaceId);
@@ -420,9 +423,12 @@ public class InstanceController {
         // 处理心跳信息，并组装结果进行返回
         int resultCode = getInstanceOperator()
                 .handleBeat(namespaceId, serviceName, ip, port, clusterName, clientBeat, builder);
+        // 设置心跳处理结果code
         result.put(CommonParams.CODE, resultCode);
+        // 设置客户端下一次心跳间隔周期
         result.put(SwitchEntry.CLIENT_BEAT_INTERVAL,
                 getInstanceOperator().getHeartBeatInterval(namespaceId, serviceName, ip, port, clusterName));
+        // 设置是否轻量级心跳的为true,那么下一次心跳请求的时候，客户端，就不会携带beat数据
         result.put(SwitchEntry.LIGHT_BEAT_ENABLED, switchDomain.isLightBeatEnabled());
         return result;
     }

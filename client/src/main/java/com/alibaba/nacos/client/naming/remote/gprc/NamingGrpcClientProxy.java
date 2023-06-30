@@ -223,7 +223,7 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
                 NamingRemoteConstants.REGISTER_INSTANCE, instance);
         // 通过grpc方法进行远程服务调用，请求Nacos服务端注册
         requestToServer(request, Response.class);
-        // 标识InstanceRedoData注册状态为true
+        // 标识重做数据（redoData）已注册
         redoService.instanceRegistered(serviceName, groupName);
     }
     
@@ -373,7 +373,7 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
         try {
             request.putAllHeader(
                     getSecurityHeaders(request.getNamespace(), request.getGroupName(), request.getServiceName()));
-            // 真正发起grpc调用
+            // 真正发起grpc调用, 接下来的逻辑就是看Nacos服务端怎么处理这个grpc请求了
             Response response =
                     requestTimeout < 0 ? rpcClient.request(request) : rpcClient.request(request, requestTimeout);
             if (ResponseCode.SUCCESS.getCode() != response.getResultCode()) {

@@ -239,7 +239,7 @@ public class InstanceOperatorClientImpl implements InstanceOperator {
     @Override
     public int handleBeat(String namespaceId, String serviceName, String ip, int port, String cluster,
             RsInfo clientBeat, BeatInfoInstanceBuilder builder) throws NacosException {
-        // 获取服务信息
+        // 从缓存中获取服务数据，此时缓存中正常情况下一定会存在服务数据
         Service service = getService(namespaceId, serviceName, true);
         // 获取客户端ID
         String clientId = IpPortBasedClient.getClientId(ip + InternetAddressUtil.IP_PORT_SPLITER + port, true);
@@ -271,9 +271,9 @@ public class InstanceOperatorClientImpl implements InstanceOperator {
             clientBeat.setCluster(cluster);
             clientBeat.setServiceName(serviceName);
         }
-        // 创建心跳处理器任务。 实现了runnable接口
+        // 创建一个客户端心跳处理器实例，实现了runnable接口，关注run()方法
         ClientBeatProcessorV2 beatProcessor = new ClientBeatProcessorV2(namespaceId, clientBeat, client);
-        // 健康检查
+        // 立即开启调度任务
         HealthCheckReactor.scheduleNow(beatProcessor);
         client.setLastUpdatedTime();
         return NamingResponseCode.OK;

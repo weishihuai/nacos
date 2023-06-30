@@ -51,7 +51,8 @@ public class NacosRuntimeConnectionEjector extends RuntimeConnectionEjector {
         try {
     
             Loggers.CONNECTION.info("Connection check task start");
-    
+
+            // 拿到当前所有的连接
             Map<String, Connection> connections = connectionManager.connections;
             int totalCount = connections.size();
             MetricsMonitor.getLongConnectionMonitor().set(totalCount);
@@ -59,12 +60,14 @@ public class NacosRuntimeConnectionEjector extends RuntimeConnectionEjector {
             
             Loggers.CONNECTION.info("Long connection metrics detail ,Total count ={}, sdkCount={},clusterCount={}",
                     totalCount, currentSdkClientCount, (totalCount - currentSdkClientCount));
-            
+
+            // 用于存放超时的连接集合
             Set<String> outDatedConnections = new HashSet<>();
             long now = System.currentTimeMillis();
-            //outdated connections collect.
             for (Map.Entry<String, Connection> entry : connections.entrySet()) {
                 Connection client = entry.getValue();
+                // client.getMetaInfo().getLastActiveTime(): 客户端最近一次活跃时间
+                // 客户端最近一次活跃时间距离当前时间超过20s的客户端，服务端会发起请求探活，如果失败或者超过1s未响应则剔除服务。
                 if (now - client.getMetaInfo().getLastActiveTime() >= KEEP_ALIVE_TIME) {
                     outDatedConnections.add(client.getMetaInfo().getConnectionId());
                 }
@@ -73,12 +76,14 @@ public class NacosRuntimeConnectionEjector extends RuntimeConnectionEjector {
             // check out date connection
             Loggers.CONNECTION.info("Out dated connection ,size={}", outDatedConnections.size());
             if (CollectionUtils.isNotEmpty(outDatedConnections)) {
+                // 记录成功探活的客户端连接的集合
                 Set<String> successConnections = new HashSet<>();
                 final CountDownLatch latch = new CountDownLatch(outDatedConnections.size());
                 for (String outDateConnectionId : outDatedConnections) {
                     try {
                         Connection connection = connectionManager.getConnection(outDateConnectionId);
                         if (connection != null) {
+                            // 创建一个客户端检测请求
                             ClientDetectionRequest clientDetectionRequest = new ClientDetectionRequest();
                             connection.asyncRequest(clientDetectionRequest, new RequestCallBack() {
                                 @Override
@@ -95,6 +100,7 @@ public class NacosRuntimeConnectionEjector extends RuntimeConnectionEjector {
                                 public void onResponse(Response response) {
                                     latch.countDown();
                                     if (response != null && response.isSuccess()) {
+                                        // 探活成功，更新最近活跃时间，然后加入到探活成功的集合中
                                         connection.freshActiveTime();
                                         successConnections.add(outDateConnectionId);
                                     }
@@ -124,8 +130,10 @@ public class NacosRuntimeConnectionEjector extends RuntimeConnectionEjector {
                 Loggers.CONNECTION.info("Out dated connection check successCount={}", successConnections.size());
                 
                 for (String outDateConnectionId : outDatedConnections) {
+                    // 不在探活成功的集合，说明探活失败，执行注销连接操作
                     if (!successConnections.contains(outDateConnectionId)) {
                         Loggers.CONNECTION.info("[{}]Unregister Out dated connection....", outDateConnectionId);
+                        // 注销过期连接
                         connectionManager.unregister(outDateConnectionId);
                     }
                 }
