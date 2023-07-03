@@ -123,11 +123,15 @@ public class ServiceInfoHolder implements Closeable {
     
     public ServiceInfo getServiceInfo(final String serviceName, final String groupName, final String clusters) {
         NAMING_LOGGER.debug("failover-mode: {}", failoverReactor.isFailoverSwitch());
+        // 组装服务名(带组名)：groupName@@serviceName
         String groupedServiceName = NamingUtils.getGroupedName(serviceName, groupName);
+        // 如果指定了集群，那么key还会加上"@@clusters"
         String key = ServiceInfo.getKey(groupedServiceName, clusters);
         if (failoverReactor.isFailoverSwitch()) {
             return failoverReactor.getService(key);
         }
+        // ConcurrentMap<String, ServiceInfo> serviceInfoMap
+        // 从缓存中获取服务信息
         return serviceInfoMap.get(key);
     }
     
@@ -171,10 +175,10 @@ public class ServiceInfoHolder implements Closeable {
         if (changed) {
             NAMING_LOGGER.info("current ips:({}) service: {} -> {}", serviceInfo.ipCount(), serviceInfo.getKey(),
                     JacksonUtils.toJson(serviceInfo.getHosts()));
-            // 如果发生改变，发送实例变更事件
+            // 如果发生改变，发送实例变更事件，处理源码在：InstancesChangeNotifier
             NotifyCenter.publishEvent(new InstancesChangeEvent(notifierEventScope, serviceInfo.getName(), serviceInfo.getGroupName(),
                     serviceInfo.getClusters(), serviceInfo.getHosts()));
-            // 磁盘缓存也写一份
+            // 同步serviceInfo数据到本地文件
             DiskCache.write(serviceInfo, cacheDir);
         }
         return serviceInfo;

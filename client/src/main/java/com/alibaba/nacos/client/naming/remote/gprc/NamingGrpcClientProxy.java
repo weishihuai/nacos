@@ -263,10 +263,13 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
     @Override
     public ServiceInfo queryInstancesOfService(String serviceName, String groupName, String clusters, int udpPort,
             boolean healthyOnly) throws NacosException {
+        // 构建服务查询请求
+        // Nacos服务端处理是在：com.alibaba.nacos.naming.remote.rpc.handler.ServiceQueryRequestHandler.handle
         ServiceQueryRequest request = new ServiceQueryRequest(namespaceId, serviceName, groupName);
         request.setCluster(clusters);
         request.setHealthyOnly(healthyOnly);
         request.setUdpPort(udpPort);
+        // 通过grpc请求Nacos服务端处理
         QueryServiceResponse response = requestToServer(request, QueryServiceResponse.class);
         return response.getServiceInfo();
     }
@@ -294,13 +297,16 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
     @Override
     public ListView<String> getServiceList(int pageNo, int pageSize, String groupName, AbstractSelector selector)
             throws NacosException {
+        // 构建ServiceListRequest请求（服务列表请求），指定命名空间ID、服务组名
         ServiceListRequest request = new ServiceListRequest(namespaceId, groupName, pageNo, pageSize);
         if (selector != null) {
             if (SelectorType.valueOf(selector.getType()) == SelectorType.label) {
                 request.setSelector(JacksonUtils.toJson(selector));
             }
         }
+        // 发送服务列表请求给Nacos服务端，接下来由服务端处理
         ServiceListResponse response = requestToServer(request, ServiceListResponse.class);
+        // 组装返回值出去
         ListView<String> result = new ListView<>();
         result.setCount(response.getCount());
         result.setData(response.getServiceNames());
@@ -312,7 +318,12 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
         if (NAMING_LOGGER.isDebugEnabled()) {
             NAMING_LOGGER.debug("[GRPC-SUBSCRIBE] service:{}, group:{}, cluster:{} ", serviceName, groupName, clusters);
         }
+        // 缓存SubscriberRedoData重做数据，定时使用redoData重新订阅，
+        // 具体实现在RedoScheduledTask(由NamingGrpcRedoService定时调度)，最终调用的也是NamingGrpcClientProxy#doSubscribe
+
+        // 缓存重做数据保存在map中：private final ConcurrentMap<String, SubscriberRedoData> subscribes = new ConcurrentHashMap<>();
         redoService.cacheSubscriberForRedo(serviceName, groupName, clusters);
+        // 使用grpc发送服务订阅请求
         return doSubscribe(serviceName, groupName, clusters);
     }
     
@@ -326,9 +337,13 @@ public class NamingGrpcClientProxy extends AbstractNamingClientProxy {
      * @throws NacosException nacos exception
      */
     public ServiceInfo doSubscribe(String serviceName, String groupName, String clusters) throws NacosException {
+        // 构建一个SubscribeServiceRequest客户端订阅请求
+        // 服务端处理代码: com.alibaba.nacos.naming.remote.rpc.handler.SubscribeServiceRequestHandler.handle
         SubscribeServiceRequest request = new SubscribeServiceRequest(namespaceId, groupName, serviceName, clusters,
                 true);
+        // grpc请求Nacos服务端进行订阅
         SubscribeServiceResponse response = requestToServer(request, SubscribeServiceResponse.class);
+        // 标记SubscriberRedoData重做数据为已订阅
         redoService.subscriberRegistered(serviceName, groupName, clusters);
         return response.getServiceInfo();
     }

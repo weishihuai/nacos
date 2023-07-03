@@ -160,8 +160,11 @@ public class EphemeralClientOperationServiceImpl implements ClientOperationServi
         if (!clientIsLegal(client, clientId)) {
             return;
         }
+        // 添加到订阅者列表中，实际上就是保存在map中
+        // 订阅者列表： protected final ConcurrentHashMap<Service, Subscriber> subscribers = new ConcurrentHashMap<>(16, 0.75f, 1);
         client.addServiceSubscriber(singleton, subscriber);
         client.setLastUpdatedTime();
+        // 发布客户端订阅事件
         NotifyCenter.publishEvent(new ClientOperationEvent.ClientSubscribeServiceEvent(singleton, clientId));
     }
     
@@ -172,8 +175,10 @@ public class EphemeralClientOperationServiceImpl implements ClientOperationServi
         if (!clientIsLegal(client, clientId)) {
             return;
         }
+        // 从订阅者列表中移除这个服务
         client.removeServiceSubscriber(singleton);
         client.setLastUpdatedTime();
+        // 发布取消订阅事件
         NotifyCenter.publishEvent(new ClientOperationEvent.ClientUnsubscribeServiceEvent(singleton, clientId));
     }
     

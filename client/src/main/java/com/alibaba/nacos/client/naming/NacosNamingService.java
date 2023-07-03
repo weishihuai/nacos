@@ -305,15 +305,29 @@ public class NacosNamingService implements NamingService {
             boolean subscribe) throws NacosException {
         
         ServiceInfo serviceInfo;
+        // 集群名称,使用逗号分隔
         String clusterString = StringUtils.join(clusters, ",");
+
+        // 是否订阅，默认是订阅的
         if (subscribe) {
+            /**
+             * 1.从缓存中获取ServiceInfo
+             * ConcurrentMap<String, ServiceInfo> serviceInfoMap
+             * key:  groupName@@serviceName  或者  groupName@@serviceName@@clusterString
+             * value: ServiceInfo
+             */
             serviceInfo = serviceInfoHolder.getServiceInfo(serviceName, groupName, clusterString);
+            // 2.缓存为空，执行订阅服务
             if (null == serviceInfo) {
+                // clientProxy在构造方法中初始化为：NamingClientProxyDelegate
                 serviceInfo = clientProxy.subscribe(serviceName, groupName, clusterString);
             }
         } else {
+            // 3.非订阅，通过grpc发送ServiceQueryRequest服务查询请求
+            // clientProxy在构造方法中初始化为：NamingClientProxyDelegate
             serviceInfo = clientProxy.queryInstancesOfService(serviceName, groupName, clusterString, 0, false);
         }
+        // 4.筛选满足条件的实例
         return selectInstances(serviceInfo, healthy);
     }
     
@@ -322,10 +336,12 @@ public class NacosNamingService implements NamingService {
         if (serviceInfo == null || CollectionUtils.isEmpty(list = serviceInfo.getHosts())) {
             return new ArrayList<>();
         }
-        
+
+        // 遍历所有实例，直接移除掉不满足条件的实例
         Iterator<Instance> iterator = list.iterator();
         while (iterator.hasNext()) {
             Instance instance = iterator.next();
+            // 筛选出健康、启用、权重大于0的实例
             if (healthy != instance.isHealthy() || !instance.isEnabled() || instance.getWeight() <= 0) {
                 iterator.remove();
             }

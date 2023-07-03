@@ -67,17 +67,24 @@ public class SubscribeServiceRequestHandler extends RequestHandler<SubscribeServ
         String groupName = request.getGroupName();
         String app = request.getHeader("app", "unknown");
         String groupedServiceName = NamingUtils.getGroupedName(serviceName, groupName);
+        // 构建一个Service服务，指定为临时实例
         Service service = Service.newService(namespaceId, groupName, serviceName, true);
+        // 构建Subscriber订阅者对象
         Subscriber subscriber = new Subscriber(meta.getClientIp(), meta.getClientVersion(), app, meta.getClientIp(),
                 namespaceId, groupedServiceName, 0, request.getClusters());
+        // serviceStorage.getData(service): 从缓存中获取serviceInfo
+        // metadataManager.getServiceMetadata(service).orElse(null): 从内存(map)获取ServiceMetadata
+        // ServiceUtil.selectInstancesWithHealthyProtection(): 仅包含有保护机制的健康实例
         ServiceInfo serviceInfo = ServiceUtil.selectInstancesWithHealthyProtection(serviceStorage.getData(service),
                 metadataManager.getServiceMetadata(service).orElse(null), subscriber.getCluster(), false,
                 true, subscriber.getIp());
         if (request.isSubscribe()) {
+            // 订阅服务
             clientOperationService.subscribeService(service, subscriber, meta.getConnectionId());
             NotifyCenter.publishEvent(new SubscribeServiceTraceEvent(System.currentTimeMillis(),
                     meta.getClientIp(), service.getNamespace(), service.getGroup(), service.getName()));
         } else {
+            // 取消订阅服务
             clientOperationService.unsubscribeService(service, subscriber, meta.getConnectionId());
             NotifyCenter.publishEvent(new UnsubscribeServiceTraceEvent(System.currentTimeMillis(),
                     meta.getClientIp(), service.getNamespace(), service.getGroup(), service.getName()));

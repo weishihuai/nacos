@@ -57,8 +57,11 @@ public class ServiceQueryRequestHandler extends RequestHandler<ServiceQueryReque
         Service service = Service.newService(namespaceId, groupName, serviceName);
         String cluster = null == request.getCluster() ? "" : request.getCluster();
         boolean healthyOnly = request.isHealthyOnly();
+        // 从缓存中获取serviceInfo
         ServiceInfo result = serviceStorage.getData(service);
+        // 从内存(map)获取ServiceMetadata
         ServiceMetadata serviceMetadata = metadataManager.getServiceMetadata(service).orElse(null);
+        // 获取有保护机制的健康实例
         result = ServiceUtil.selectInstancesWithHealthyProtection(result, serviceMetadata, cluster, healthyOnly, true,
                 meta.getClientIp());
         return QueryServiceResponse.buildSuccessResponse(result);

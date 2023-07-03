@@ -99,21 +99,28 @@ public class ServiceInfoUpdateService implements Closeable {
         if (!asyncQuerySubscribeService) {
             return;
         }
+        // 组装key   格式：groupName@@serviceName@@clusters
         String serviceKey = ServiceInfo.getKey(NamingUtils.getGroupedName(serviceName, groupName), clusters);
+        // Map<String, ScheduledFuture<?>> futureMap = new HashMap<>()
+        // futureMap用于保存UpdateTask线程池任务的执行结果
         if (futureMap.get(serviceKey) != null) {
             return;
         }
         synchronized (futureMap) {
+            // double check双重检查，如果非空，直接返回，也就是相同的groupName@@serviceName@@clusters，只会存在一个UpdateTask任务
             if (futureMap.get(serviceKey) != null) {
                 return;
             }
-            
+
+            // 往线程池中添加一个更新任务
+            // UpdateTask实现了Runnable接口，需要关注其run()方法
             ScheduledFuture<?> future = addTask(new UpdateTask(serviceName, groupName, clusters));
             futureMap.put(serviceKey, future);
         }
     }
     
     private synchronized ScheduledFuture<?> addTask(UpdateTask task) {
+        // 延迟1s执行UpdateTask
         return executor.schedule(task, DEFAULT_DELAY, TimeUnit.MILLISECONDS);
     }
     
@@ -188,23 +195,29 @@ public class ServiceInfoUpdateService implements Closeable {
                 
                 ServiceInfo serviceObj = serviceInfoHolder.getServiceInfoMap().get(serviceKey);
                 if (serviceObj == null) {
+                    // 使用grpc向服务端发送ServiceQueryRequest服务查询请求
                     serviceObj = namingClientProxy.queryInstancesOfService(serviceName, groupName, clusters, 0, false);
+                    // 处理服务信息：获取老的服务信息，将新的服务信息重新存入客户端缓存中，对比新的服务信息，如发生变更，则发布实例变更数据，并同步serviceInfo数据到本地文件
                     serviceInfoHolder.processServiceInfo(serviceObj);
                     lastRefTime = serviceObj.getLastRefTime();
                     return;
                 }
                 
                 if (serviceObj.getLastRefTime() <= lastRefTime) {
+                    // 使用grpc向服务端发送ServiceQueryRequest服务查询请求
                     serviceObj = namingClientProxy.queryInstancesOfService(serviceName, groupName, clusters, 0, false);
+                    // 处理服务信息：获取老的服务信息，将新的服务信息重新存入客户端缓存中，对比新的服务信息，如发生变更，则发布实例变更数据，并同步serviceInfo数据到本地文件
                     serviceInfoHolder.processServiceInfo(serviceObj);
                 }
                 lastRefTime = serviceObj.getLastRefTime();
                 if (CollectionUtils.isEmpty(serviceObj.getHosts())) {
+                    // 记录失败次数
                     incFailCount();
                     return;
                 }
                 // TODO multiple time can be configured.
                 delayTime = serviceObj.getCacheMillis() * DEFAULT_UPDATE_CACHE_TIME_MULTIPLE;
+                // 重置失败次数
                 resetFailCount();
             } catch (NacosException e) {
                 handleNacosException(e);
@@ -212,6 +225,7 @@ public class ServiceInfoUpdateService implements Closeable {
                 handleUnknownException(e);
             } finally {
                 if (!isCancel) {
+                    // 注意：延时时间最长为60s，时长和失败次数相关（失败次数越大，延时时间越长）
                     executor.schedule(this, Math.min(delayTime << failCount, DEFAULT_DELAY * 60),
                             TimeUnit.MILLISECONDS);
                 }
