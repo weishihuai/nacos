@@ -51,7 +51,10 @@ import java.util.concurrent.TimeUnit;
 @DependsOn("clientServiceIndexesManager")
 @Component("ephemeralIpPortClientManager")
 public class EphemeralIpPortClientManager implements ClientManager {
-    
+
+    /**
+     * 通过map存储clientId和client之间的映射关系
+     */
     private final ConcurrentMap<String, IpPortBasedClient> clients = new ConcurrentHashMap<>();
     
     private final DistroMapper distroMapper;

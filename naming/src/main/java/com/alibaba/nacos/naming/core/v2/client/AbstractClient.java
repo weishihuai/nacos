@@ -44,10 +44,15 @@ import static com.alibaba.nacos.naming.constants.ClientConstants.REVISION;
 public abstract class AbstractClient implements Client {
 
     /**
-     * 发布者列表
+     * 当前客户端的服务注册表
+     * 一个客户机的服务实例注册Publish，注意对于单个客户端来说，同一个服务只能注册一个实例
      */
     protected final ConcurrentHashMap<Service, InstancePublishInfo> publishers = new ConcurrentHashMap<>(16, 0.75f, 1);
-    
+
+    /**
+     * 当前客户端的订阅者列表
+     * 一个客户机的服务订阅Subscribe
+     */
     protected final ConcurrentHashMap<Service, Subscriber> subscribers = new ConcurrentHashMap<>(16, 0.75f, 1);
     
     protected volatile long lastUpdatedTime;

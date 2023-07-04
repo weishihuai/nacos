@@ -111,6 +111,7 @@ public class InstanceOperatorClientImpl implements InstanceOperator {
         String clientId = IpPortBasedClient.getClientId(instance.toInetAddr(), ephemeral);
 
         // 向clientManager中注册客户端，后面会获取进行使用的,其实这就是客户端管理的地方
+        // 通过客户端ID创建客户端连接
         createIpPortClientIfAbsent(clientId);
 
         // 通过namespaceId+组名+服务名称+是否临时实例，创建出一个Service

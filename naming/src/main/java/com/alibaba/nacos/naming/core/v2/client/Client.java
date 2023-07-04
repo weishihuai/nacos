@@ -25,6 +25,8 @@ import java.util.Collection;
 /**
  * Nacos naming client.
  *
+ * 用于存储客户端已发布和订阅了哪些服务
+ *
  * <p>The abstract concept of the client stored by on the server of Nacos naming module. It is used to store which
  * services the client has published and subscribed.
  *
@@ -57,7 +59,7 @@ public interface Client {
     
     /**
      * Get the last time for updating current client.
-     *
+     * 获取客户端更新时间
      * @return last time for updating
      */
     long getLastUpdatedTime();
@@ -135,7 +137,7 @@ public interface Client {
     
     /**
      * Generate sync data.
-     *
+     * 生成同步给其他节点的client数据
      * @return sync data
      */
     ClientSyncData generateSyncData();

@@ -46,7 +46,7 @@ import static com.alibaba.nacos.client.utils.LogUtils.NAMING_LOGGER;
 
 /**
  * 代理委托类：这个类并不是真正的代理类，真正的代理类是grpcClientProxy和httpClientProxy，
- * 这个类仅仅是做了一个委托功能，将处理的方法委托给了这两个代理类去处理。
+ * 这个类仅仅是做了一个委托功能，将处理的方法委托给了这两个代理类去处理。根据实际情况选择http或gRPC协议请求服务端。
  *
  * Delegate of naming client proxy.
  *
@@ -175,7 +175,7 @@ public class NamingClientProxyDelegate implements NamingClientProxy {
         String serviceNameWithGroup = NamingUtils.getGroupedName(serviceName, groupName);
         // 如果集群名称非空，拼接上clusters
         String serviceKey = ServiceInfo.getKey(serviceNameWithGroup, clusters);
-        // 调度更新，往线程池中提交一个UpdateTask任务
+        // 调度更新，往线程池中提交一个UpdateTask任务，持续更新订阅服务的注册表
         serviceInfoUpdateService.scheduleUpdateIfAbsent(serviceName, groupName, clusters);
         // 获取缓存中的服务信息
         ServiceInfo result = serviceInfoHolder.getServiceInfoMap().get(serviceKey);
@@ -209,6 +209,9 @@ public class NamingClientProxyDelegate implements NamingClientProxy {
     private NamingClientProxy getExecuteClientProxy(Instance instance) {
         // 如果是临时实例，使用grpc方式，否则使用http方式
         // ephemeral默认为true,也就是返回grpcClientProxy,Nacos 2.0版本将http的请求换成了gRpc了
+
+        // 临时instance：gRPC长连接
+        // 持久instance：http短连接
         return instance.isEphemeral() ? grpcClientProxy : httpClientProxy;
     }
     

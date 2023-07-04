@@ -55,9 +55,16 @@ public class ServiceStorage {
     private final SwitchDomain switchDomain;
     
     private final NamingMetadataManager metadataManager;
-    
+
+    /**
+     * 服务与服务下实例的关联关系
+     * service -> instance
+     */
     private final ConcurrentMap<Service, ServiceInfo> serviceDataIndexes;
-    
+
+    /**
+     * service -> Set<clusters>
+     */
     private final ConcurrentMap<Service, Set<String>> serviceClusterIndex;
     
     public ServiceStorage(ClientServiceIndexesManager serviceIndexesManager, ClientManagerDelegate clientManager,
@@ -75,6 +82,7 @@ public class ServiceStorage {
     }
     
     public ServiceInfo getData(Service service) {
+        // 缓存中存在，直接返回，否则查询后返回
         return serviceDataIndexes.containsKey(service) ? serviceDataIndexes.get(service) : getPushData(service);
     }
     
@@ -84,7 +92,9 @@ public class ServiceStorage {
             return result;
         }
         Service singleton = ServiceManager.getInstance().getSingleton(service);
+        // 查询instance放入结果集
         result.setHosts(getAllInstancesFromIndex(singleton));
+        // 本地缓存service->List<instance>的映射
         serviceDataIndexes.put(singleton, result);
         return result;
     }
@@ -106,7 +116,9 @@ public class ServiceStorage {
     private List<Instance> getAllInstancesFromIndex(Service service) {
         Set<Instance> result = new HashSet<>();
         Set<String> clusters = new HashSet<>();
+        // 获取所有发布当前service的发布clientId集合
         for (String each : serviceIndexesManager.getAllClientsRegisteredService(service)) {
+            // 找到每个client对应的instance
             Optional<InstancePublishInfo> instancePublishInfo = getInstanceInfo(each, service);
             if (instancePublishInfo.isPresent()) {
                 InstancePublishInfo publishInfo = instancePublishInfo.get();

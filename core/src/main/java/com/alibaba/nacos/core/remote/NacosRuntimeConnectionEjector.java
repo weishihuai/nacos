@@ -66,8 +66,8 @@ public class NacosRuntimeConnectionEjector extends RuntimeConnectionEjector {
             long now = System.currentTimeMillis();
             for (Map.Entry<String, Connection> entry : connections.entrySet()) {
                 Connection client = entry.getValue();
-                // client.getMetaInfo().getLastActiveTime(): 客户端最近一次活跃时间
-                // 客户端最近一次活跃时间距离当前时间超过20s的客户端，服务端会发起请求探活，如果失败或者超过1s未响应则剔除服务。
+                // client.getMetaInfo().getLastActiveTime(): 客户端上一次活跃时间
+                // 客户端上一次活跃时间距离当前时间超过20s的客户端，服务端会发起请求探活，如果失败或者超过指定时间未响应则剔除服务。
                 if (now - client.getMetaInfo().getLastActiveTime() >= KEEP_ALIVE_TIME) {
                     outDatedConnections.add(client.getMetaInfo().getConnectionId());
                 }
@@ -100,7 +100,7 @@ public class NacosRuntimeConnectionEjector extends RuntimeConnectionEjector {
                                 public void onResponse(Response response) {
                                     latch.countDown();
                                     if (response != null && response.isSuccess()) {
-                                        // 探活成功，更新最近活跃时间，然后加入到探活成功的集合中
+                                        // 探活成功，更新活跃时间，然后加入到探活成功的集合中
                                         connection.freshActiveTime();
                                         successConnections.add(outDateConnectionId);
                                     }

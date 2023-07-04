@@ -215,7 +215,7 @@ public class ServiceInfoUpdateService implements Closeable {
                     incFailCount();
                     return;
                 }
-                // TODO multiple time can be configured.
+                // 服务端控制cacheMillis=10s 这里乘以6，所以60s更新一次
                 delayTime = serviceObj.getCacheMillis() * DEFAULT_UPDATE_CACHE_TIME_MULTIPLE;
                 // 重置失败次数
                 resetFailCount();

@@ -36,7 +36,12 @@ public class ServiceManager {
     private static final ServiceManager INSTANCE = new ServiceManager();
     
     private final ConcurrentHashMap<Service, Service> singletonRepository;
-    
+
+    /**
+     * namespace下所有的service
+     * key: namespaceId
+     * value: Set<Service>
+     */
     private final ConcurrentHashMap<String, Set<Service>> namespaceSingletonMaps;
     
     private ServiceManager() {
@@ -60,6 +65,7 @@ public class ServiceManager {
      */
     public Service getSingleton(Service service) {
         // 如果service在singletonRepository中找不到，则存入到singletonRepository中；否则返回已存在的Service
+        // 怎么判断service是否已经存在，service重写了equal和hasCode方法，namespace+group+serviceName在服务端是一个单例Service
         singletonRepository.computeIfAbsent(service, key -> {
             NotifyCenter.publishEvent(new MetadataEvent.ServiceMetadataEvent(service, false));
             return service;

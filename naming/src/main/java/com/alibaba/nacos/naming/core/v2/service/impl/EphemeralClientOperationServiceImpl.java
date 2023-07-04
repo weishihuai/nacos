@@ -58,7 +58,7 @@ public class EphemeralClientOperationServiceImpl implements ClientOperationServi
         NamingUtils.checkInstanceIsLegal(instance);
 
         // ServiceManager.getInstance()使用饿汉式单例返回一个ServiceManager对象
-        // getSingleton从缓存singletonRepository中获取一个单例Service, 已存在的时候直接从缓存获取
+        // getSingleton从缓存singletonRepository中获取一个单例Service, 已存在的时候直接从缓存获取（注意Service的equals和hasCode方法）
         Service singleton = ServiceManager.getInstance().getSingleton(service);
 
         // 判断获取到的service是否是临时实例，如果不是，则报错，因为当前的service（EphemeralClientOperationServiceImpl）就是处理临时实例的
@@ -68,7 +68,7 @@ public class EphemeralClientOperationServiceImpl implements ClientOperationServi
                             singleton.getGroupedServiceName()));
         }
 
-        // 根据clientId从客户端管理器中获取对应的客户端
+        // 根据客户端ID从客户端管理器中找到客户端信息,这个关系在连接建立的时候存储
         // clientId=172.110.0.138:1001#true
         Client client = clientManager.getClient(clientId);
 
@@ -83,6 +83,7 @@ public class EphemeralClientOperationServiceImpl implements ClientOperationServi
         InstancePublishInfo instanceInfo = getPublishInfo(instance);
 
         /**
+         * 负责存储当前客户端服务注册表，也就是 service和instance的关系。
          * 1. 客户端将自己注册到了服务器端的ClientManager中；
          * 2. Client客户端内部有一个Map: ConcurrentHashMap<Service, InstancePublishInfo> publishers. 即发布者列表
          * 3. 将实例信息放入发布者列表中（ key: Service 、 value: 实例发布信息）
