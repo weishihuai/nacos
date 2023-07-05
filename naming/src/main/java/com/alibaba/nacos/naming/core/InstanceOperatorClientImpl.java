@@ -106,7 +106,7 @@ public class InstanceOperatorClientImpl implements InstanceOperator {
         // 是否临时实例，默认为true
         boolean ephemeral = instance.isEphemeral();
 
-        // instance.toInetAddr()返回IP+":"+端口号，在本例中clientId=172.110.0.138:1001#true
+        // getClientId返回【IP+":"+端口号+"#"+是否临时】，在本例中clientId=172.110.0.138:1001#true, true指的是临时（短暂）的客户端
         // 获取客户端ID
         String clientId = IpPortBasedClient.getClientId(instance.toInetAddr(), ephemeral);
 
@@ -360,6 +360,8 @@ public class InstanceOperatorClientImpl implements InstanceOperator {
     }
     
     private void createIpPortClientIfAbsent(String clientId) {
+        // 如果不是第一次注册的话，则不处理
+        // 如果是第一次注册的话，则生成一个新的client
         if (!clientManager.contains(clientId)) {
             ClientAttributes clientAttributes;
             if (ClientAttributesFilter.threadLocalClientAttributes.get() != null) {
@@ -367,6 +369,7 @@ public class InstanceOperatorClientImpl implements InstanceOperator {
             } else {
                 clientAttributes = new ClientAttributes();
             }
+            // 创建一个新的客户端，
             clientManager.clientConnected(clientId, clientAttributes);
         }
     }

@@ -30,21 +30,21 @@ import java.util.concurrent.Executor;
 public abstract class Subscriber<T extends Event> {
     
     /**
-     * Event callback.
+     * 事件执行的回调方法
      *
      * @param event {@link Event}
      */
     public abstract void onEvent(T event);
     
     /**
-     * Type of this subscriber's subscription.
+     * 获取当前订阅者订阅的事件的类型
      *
      * @return Class which extends {@link Event}
      */
     public abstract Class<? extends Event> subscribeType();
     
     /**
-     * It is up to the listener to determine whether the callback is asynchronous or synchronous.
+     * 其子类可以来决定是同步还是异步
      *
      * @return {@link Executor}
      */
@@ -53,7 +53,7 @@ public abstract class Subscriber<T extends Event> {
     }
     
     /**
-     * Whether to ignore expired events.
+     * 是否忽略过期事件
      *
      * @return default value is {@link Boolean#FALSE}
      */

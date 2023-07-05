@@ -44,7 +44,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The manager of {@code IpPortBasedClient} and ephemeral.
+ * 短暂临时的客户端
  *
  * @author xiweng.yy
  */
@@ -54,6 +54,9 @@ public class EphemeralIpPortClientManager implements ClientManager {
 
     /**
      * 通过map存储clientId和client之间的映射关系
+     *
+     * key: IP:端口+true
+     * value: 客户端Id、客户端IP，端口等信息，里面还有一些关于客户端心跳、健康检查的一些任务
      */
     private final ConcurrentMap<String, IpPortBasedClient> clients = new ConcurrentHashMap<>();
     
@@ -63,6 +66,7 @@ public class EphemeralIpPortClientManager implements ClientManager {
     
     public EphemeralIpPortClientManager(DistroMapper distroMapper, SwitchDomain switchDomain) {
         this.distroMapper = distroMapper;
+        // 初始化一个每隔5s执行一次的过期客户端清理任务，关注ExpiredClientCleaner#run方法
         GlobalExecutor.scheduleExpiredClientCleaner(new ExpiredClientCleaner(this, switchDomain), 0,
                 Constants.DEFAULT_HEART_BEAT_INTERVAL, TimeUnit.MILLISECONDS);
         clientFactory = ClientFactoryHolder.getInstance().findClientFactory(ClientConstants.EPHEMERAL_IP_PORT);
@@ -75,9 +79,13 @@ public class EphemeralIpPortClientManager implements ClientManager {
     
     @Override
     public boolean clientConnected(final Client client) {
+        // 向clients这个存储客户端的map中添加客户端信息，并执行客户端的初始化
         clients.computeIfAbsent(client.getClientId(), s -> {
             Loggers.SRV_LOG.info("Client connection {} connect", client.getClientId());
             IpPortBasedClient ipPortBasedClient = (IpPortBasedClient) client;
+            // 初始化客户端：
+            // 针对临时客户端，启动心跳检查任务
+            // 针对持久客户端，启动健康检查任务
             ipPortBasedClient.init();
             return ipPortBasedClient;
         });
@@ -158,6 +166,7 @@ public class EphemeralIpPortClientManager implements ClientManager {
         @Override
         public void run() {
             long currentTime = System.currentTimeMillis();
+            // 遍历拿到所有的客户端的信息，校验是否过期，如果过期，通过clientManager将这个客户端移除
             for (String each : clientManager.allClientId()) {
                 IpPortBasedClient client = (IpPortBasedClient) clientManager.getClient(each);
                 if (null != client && isExpireClient(currentTime, client)) {

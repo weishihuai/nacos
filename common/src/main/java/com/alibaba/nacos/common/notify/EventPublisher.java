@@ -29,7 +29,7 @@ import com.alibaba.nacos.common.notify.listener.Subscriber;
 public interface EventPublisher extends Closeable {
     
     /**
-     * 初始化逻辑
+     * 初始化事件发布者
      * Initializes the event publisher.
      *
      * @param type       {@link Event >}
@@ -38,7 +38,7 @@ public interface EventPublisher extends Closeable {
     void init(Class<? extends Event> type, int bufferSize);
     
     /**
-     * 事件数量
+     * 事件队列长度
      *
      * The number of currently staged events.
      *

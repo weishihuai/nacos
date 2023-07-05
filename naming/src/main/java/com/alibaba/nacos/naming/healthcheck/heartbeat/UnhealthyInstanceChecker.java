@@ -36,7 +36,7 @@ import com.alibaba.nacos.sys.utils.ApplicationUtils;
 import java.util.Optional;
 
 /**
- * Instance beat checker for unhealthy instances.
+ * 例心跳检查-健康状态检查，超过15s未收到心跳信息，将实例状态变更为亚健康状态。
  *
  * <p>Mark these instances healthy status {@code false} if beat time out.
  *
@@ -46,13 +46,16 @@ public class UnhealthyInstanceChecker implements InstanceBeatChecker {
     
     @Override
     public void doCheck(Client client, Service service, HealthCheckInstancePublishInfo instance) {
+        // 如果实例当前状态是健康状态，并且超过15s（默认为15s）没有收到心跳信息
         if (instance.isHealthy() && isUnhealthy(service, instance)) {
+            // 将实例状态置为亚健康状态，然后发布服务变更、客户单变更、实例健康状态变更事件
             changeHealthyStatus(client, service, instance);
         }
     }
     
     private boolean isUnhealthy(Service service, HealthCheckInstancePublishInfo instance) {
         long beatTimeout = getTimeout(service, instance);
+        // 当前时间减去最后一次心跳时间是否大于心跳超时时间
         return System.currentTimeMillis() - instance.getLastHeartBeatTime() > beatTimeout;
     }
     

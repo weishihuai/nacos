@@ -38,7 +38,7 @@ import com.alibaba.nacos.sys.utils.ApplicationUtils;
 import java.util.Optional;
 
 /**
- * Instance beat checker for expired instance.
+ * 实例心跳检查-过期状态检查
  *
  * <p>Delete the instance if has expired.
  *
@@ -48,14 +48,18 @@ public class ExpiredInstanceChecker implements InstanceBeatChecker {
     
     @Override
     public void doCheck(Client client, Service service, HealthCheckInstancePublishInfo instance) {
+        // 默认为true
         boolean expireInstance = ApplicationUtils.getBean(GlobalConfig.class).isExpireInstance();
+        // 超过30s（默认为30s）未收到心跳，触发实例剔除
         if (expireInstance && isExpireInstance(service, instance)) {
+            // 从当前客户端的服务注册表中移除这个服务，然后发布客户端下线、实例元数据事件
             deleteIp(client, service, instance);
         }
     }
     
     private boolean isExpireInstance(Service service, HealthCheckInstancePublishInfo instance) {
         long deleteTimeout = getTimeout(service, instance);
+        // 当前时间减去上一次心跳时间大于超时时间，说明这个实例过期了。
         return System.currentTimeMillis() - instance.getLastHeartBeatTime() > deleteTimeout;
     }
     

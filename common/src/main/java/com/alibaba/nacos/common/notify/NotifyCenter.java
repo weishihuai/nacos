@@ -200,10 +200,13 @@ public class NotifyCenter {
     public static void registerSubscriber(final Subscriber consumer, final EventPublisherFactory factory) {
         // If you want to listen to multiple events, you do it separately,
         // based on subclass's subscribeTypes method return list, it can register to publisher.
+
+        // 判断当前订阅者监听的是否是多事件的，如果是的话，循环subscribeTypes()方法指定的事件列表，挨个进行注册
         if (consumer instanceof SmartSubscriber) {
             for (Class<? extends Event> subscribeType : ((SmartSubscriber) consumer).subscribeTypes()) {
                 // For case, producer: defaultSharePublisher -> consumer: smartSubscriber.
                 if (ClassUtils.isAssignableFrom(SlowEvent.class, subscribeType)) {
+                    // 如果是SlowEvent事件类型，则注册到共享的发布器defaultSharePublisher中
                     INSTANCE.sharePublisher.addSubscriber(consumer, subscribeType);
                 } else {
                     // For case, producer: defaultPublisher -> consumer: subscriber.
@@ -223,7 +226,7 @@ public class NotifyCenter {
     }
     
     /**
-     * 往生产中添加一个订阅者
+     * 向publishMap添加事件发布者，同时添加订阅者
      * Add a subscriber to publisher.
      *
      * @param consumer      subscriber instance.
@@ -236,6 +239,7 @@ public class NotifyCenter {
         final String topic = ClassUtils.getCanonicalName(subscribeType);
         synchronized (NotifyCenter.class) {
             // MapUtils.computeIfAbsent is a unsafe method.
+            // 通过EventPublisherFactory(实现了函数式接口BiFunction的apply方法)以及传入的订阅者的类型，来构造一个事件的发布者，然后存入到publishMap里面
             MapUtil.computeIfAbsent(INSTANCE.publisherMap, topic, factory, subscribeType, ringBufferSize);
         }
         EventPublisher publisher = INSTANCE.publisherMap.get(topic);
@@ -244,6 +248,7 @@ public class NotifyCenter {
             // 共享事件发布器
             ((ShardedEventPublisher) publisher).addSubscriber(consumer, subscribeType);
         } else {
+            // 将事件订阅者添加进刚刚的事件发布者里面
             // DefaultPublisher
             publisher.addSubscriber(consumer);
         }

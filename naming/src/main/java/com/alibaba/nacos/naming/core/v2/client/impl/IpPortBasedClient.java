@@ -133,9 +133,11 @@ public class IpPortBasedClient extends AbstractClient {
      */
     public void init() {
         if (ephemeral) {
+            // 临时客户端：每5s执行一次，首次执行延迟5s
             beatCheckTask = new ClientBeatCheckTaskV2(this);
             HealthCheckReactor.scheduleCheck(beatCheckTask);
         } else {
+            // 持久客户端：健康检查，只会执行一次，动态计算延迟时间
             healthCheckTaskV2 = new HealthCheckTaskV2(this);
             HealthCheckReactor.scheduleCheck(healthCheckTaskV2);
         }

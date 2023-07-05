@@ -21,7 +21,7 @@ import com.alibaba.nacos.naming.core.v2.client.Client;
 import com.alibaba.nacos.naming.core.v2.pojo.Service;
 
 /**
- * Operation client event.
+ * 操作客户端事件
  *
  * @author xiweng.yy
  */
@@ -47,7 +47,7 @@ public class ClientOperationEvent extends Event {
     }
     
     /**
-     * Client register service event.
+     * 客户端服务注册事件
      */
     public static class ClientRegisterServiceEvent extends ClientOperationEvent {
         
@@ -59,7 +59,7 @@ public class ClientOperationEvent extends Event {
     }
     
     /**
-     * Client deregister service event.
+     * 客户端注销服务事件
      */
     public static class ClientDeregisterServiceEvent extends ClientOperationEvent {
         
@@ -71,7 +71,7 @@ public class ClientOperationEvent extends Event {
     }
     
     /**
-     * Client subscribe service event.
+     * 客户端订阅服务事件
      */
     public static class ClientSubscribeServiceEvent extends ClientOperationEvent {
         
@@ -83,7 +83,7 @@ public class ClientOperationEvent extends Event {
     }
     
     /**
-     * Client unsubscribe service event.
+     * 客户端取消订阅服务事件
      */
     public static class ClientUnsubscribeServiceEvent extends ClientOperationEvent {
         
@@ -93,7 +93,10 @@ public class ClientOperationEvent extends Event {
             super(clientId, service);
         }
     }
-    
+
+    /**
+     * 客户端释放事件
+     */
     public static class ClientReleaseEvent extends ClientOperationEvent {
     
         private static final long serialVersionUID = -281486927726245701L;

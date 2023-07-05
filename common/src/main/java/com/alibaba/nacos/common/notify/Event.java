@@ -20,7 +20,7 @@ import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * An abstract class for event.
+ * 事件抽象
  *
  * @author <a href="mailto:liaochuntao@live.com">liaochuntao</a>
  * @author zongtanghu
@@ -29,7 +29,10 @@ import java.util.concurrent.atomic.AtomicLong;
 public abstract class Event implements Serializable {
     
     private static final long serialVersionUID = -3731383194964997493L;
-    
+
+    /**
+     * 事件序列号。每次新生成一个事件，SEQUENCE都会原子自增1次
+     */
     private static final AtomicLong SEQUENCE = new AtomicLong(0);
     
     private final long sequence = SEQUENCE.getAndIncrement();

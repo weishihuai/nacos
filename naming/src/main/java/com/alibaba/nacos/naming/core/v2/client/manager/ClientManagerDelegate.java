@@ -104,9 +104,13 @@ public class ClientManagerDelegate implements ClientManager {
     }
     
     private ClientManager getClientManagerById(String clientId) {
+        // 根据clientId是否包含"#",获取相应的ClientManager
         if (isConnectionBasedClient(clientId)) {
             return connectionBasedClientManager;
         }
+
+        // 如果clientId后缀为false，说明是持久客户端，使用的PersistentIpPortClientManager；
+        // 如果clientId后缀为true，短暂的ClientManager所对应的就是EphemeralIpPortClientManager
         return clientId.endsWith(ClientConstants.PERSISTENT_SUFFIX) ? persistentIpPortClientManager : ephemeralIpPortClientManager;
     }
     

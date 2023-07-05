@@ -23,7 +23,7 @@ import com.alibaba.nacos.naming.core.v2.client.ClientAttributes;
 import java.util.Collection;
 
 /**
- * The manager of {@code Client} Nacos naming client.
+ * 客户端管理类
  *
  * @author xiweng.yy
  */

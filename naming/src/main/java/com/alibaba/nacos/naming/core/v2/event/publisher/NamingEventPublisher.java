@@ -33,7 +33,7 @@ import java.util.concurrent.Executor;
 
 /**
  * Event publisher for naming event.
- *
+ * 事件发布者本质是一个线程
  * @author xiweng.yy
  */
 public class NamingEventPublisher extends Thread implements ShardedEventPublisher {
@@ -44,6 +44,7 @@ public class NamingEventPublisher extends Thread implements ShardedEventPublishe
 
     /**
      * 订阅者列表
+     * 一类事件 对应 一个订阅者集合
      */
     private final Map<Class<? extends Event>, Set<Subscriber<? extends Event>>> subscribes = new ConcurrentHashMap<>();
     
@@ -52,11 +53,19 @@ public class NamingEventPublisher extends Thread implements ShardedEventPublishe
     private volatile boolean shutdown = false;
     
     private int queueMaxSize = -1;
-    
+
+    /**
+     * 阻塞队列，存放事件
+     */
     private BlockingQueue<Event> queue;
     
     private String publisherName;
-    
+
+    /**
+     * 在事件发布者初始化的时候，就被当做一个线程，然后放在了NotifyCenter的publishMap里面，
+     * 并且直接调用了其start方法启动了它，然后其内部保存了一个阻塞队列，用来暂存事件，当监听到
+     * 里面的阻塞队列来了事件之后，就会消费它
+     */
     @Override
     public void init(Class<? extends Event> type, int bufferSize) {
         this.queueMaxSize = bufferSize;
@@ -65,6 +74,7 @@ public class NamingEventPublisher extends Thread implements ShardedEventPublishe
         super.setName(THREAD_NAME + this.publisherName);
         // 设置为守护线程，后台执行
         super.setDaemon(true);
+        // 启动线程
         super.start();
         initialized = true;
     }
@@ -117,6 +127,7 @@ public class NamingEventPublisher extends Thread implements ShardedEventPublishe
         if (Loggers.EVT_LOG.isDebugEnabled()) {
             Loggers.EVT_LOG.debug("[NotifyCenter] the {} will received by {}", event, subscriber);
         }
+        // 执行订阅者的onEvent方法，即每个订阅者对于该事件的处理逻辑
         // 允许订阅者支持同步还是异步方式处理
         final Runnable job = () -> subscriber.onEvent(event);
         final Executor executor = subscriber.executor();

@@ -34,11 +34,16 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ServiceManager {
     
     private static final ServiceManager INSTANCE = new ServiceManager();
-    
+
+    /**
+     * 保存单例的服务，注意，singletonRepository仅保存服务这个维度
+     * 因为Service里面是的属性是没有端口，ip等属性的，意味着这里的Service是指服务（例如：server.name = discovery-provider），
+     * 就算有几个discovery-provider，这里的Service都是泛指的discovery-provider
+     */
     private final ConcurrentHashMap<Service, Service> singletonRepository;
 
     /**
-     * namespace下所有的service
+     * 命名空间下所有的服务集合
      * key: namespaceId
      * value: Set<Service>
      */

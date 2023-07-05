@@ -82,7 +82,15 @@ public class ClientServiceIndexesManager extends SmartSubscriber {
             publisherIndexes.remove(service);
         }
     }
-    
+
+    /**
+     * ClientServiceIndexesManager订阅的事件类型集合:
+     * 1.ClientRegisterServiceEvent
+     * 2.ClientDeregisterServiceEvent
+     * 3.ClientSubscribeServiceEvent
+     * 4.ClientUnsubscribeServiceEvent
+     * 5.ClientReleaseEvent
+     */
     @Override
     public List<Class<? extends Event>> subscribeTypes() {
         List<Class<? extends Event>> result = new LinkedList<>();
