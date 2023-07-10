@@ -120,7 +120,7 @@ public class ServiceInfoUpdateService implements Closeable {
     }
     
     private synchronized ScheduledFuture<?> addTask(UpdateTask task) {
-        // 延迟1s执行UpdateTask
+        // 延迟1s执行UpdateTask定时任务
         return executor.schedule(task, DEFAULT_DELAY, TimeUnit.MILLISECONDS);
     }
     
@@ -186,14 +186,17 @@ public class ServiceInfoUpdateService implements Closeable {
             long delayTime = DEFAULT_DELAY;
             
             try {
+                // 判断是否订阅且未发起过定时任务
                 if (!changeNotifier.isSubscribed(groupName, serviceName, clusters) && !futureMap.containsKey(
                         serviceKey)) {
                     NAMING_LOGGER.info("update task is stopped, service:{}, clusters:{}", groupedServiceName, clusters);
                     isCancel = true;
                     return;
                 }
-                
+
+                // 获取ServiceInfo本地缓存
                 ServiceInfo serviceObj = serviceInfoHolder.getServiceInfoMap().get(serviceKey);
+                // 缓存不存在，直接去注册中心查
                 if (serviceObj == null) {
                     // 使用grpc向服务端发送ServiceQueryRequest服务查询请求
                     serviceObj = namingClientProxy.queryInstancesOfService(serviceName, groupName, clusters, 0, false);
@@ -202,22 +205,26 @@ public class ServiceInfoUpdateService implements Closeable {
                     lastRefTime = serviceObj.getLastRefTime();
                     return;
                 }
-                
+
+                // 缓存存在的话，判断服务信息是否过期，如过期了，还需要去注册中心重新查询
+                // 服务的最新更新时间小于等于缓存刷新时间
                 if (serviceObj.getLastRefTime() <= lastRefTime) {
                     // 使用grpc向服务端发送ServiceQueryRequest服务查询请求
                     serviceObj = namingClientProxy.queryInstancesOfService(serviceName, groupName, clusters, 0, false);
                     // 处理服务信息：获取老的服务信息，将新的服务信息重新存入客户端缓存中，对比新的服务信息，如发生变更，则发布实例变更数据，并同步serviceInfo数据到本地文件
                     serviceInfoHolder.processServiceInfo(serviceObj);
                 }
+                // 刷新更新时间
                 lastRefTime = serviceObj.getLastRefTime();
                 if (CollectionUtils.isEmpty(serviceObj.getHosts())) {
                     // 记录失败次数
                     incFailCount();
                     return;
                 }
-                // 服务端控制cacheMillis=10s 这里乘以6，所以60s更新一次
+                // 下次更新缓存时间设置，默认为6秒
+                // 服务端控制cacheMillis=1s 这里乘以6，所以6s更新一次
                 delayTime = serviceObj.getCacheMillis() * DEFAULT_UPDATE_CACHE_TIME_MULTIPLE;
-                // 重置失败次数
+                // 重置失败次数为0
                 resetFailCount();
             } catch (NacosException e) {
                 handleNacosException(e);
@@ -225,6 +232,7 @@ public class ServiceInfoUpdateService implements Closeable {
                 handleUnknownException(e);
             } finally {
                 if (!isCancel) {
+                    // 下次调度刷新时间，下次执行的时间与failCount有关
                     // 注意：延时时间最长为60s，时长和失败次数相关（失败次数越大，延时时间越长）
                     executor.schedule(this, Math.min(delayTime << failCount, DEFAULT_DELAY * 60),
                             TimeUnit.MILLISECONDS);

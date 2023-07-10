@@ -245,12 +245,16 @@ public class NacosNamingService implements NamingService {
             boolean subscribe) throws NacosException {
         ServiceInfo serviceInfo;
         String clusterString = StringUtils.join(clusters, ",");
+        // 是否订阅模式
         if (subscribe) {
+            // 先从客户端缓存获取服务信息
             serviceInfo = serviceInfoHolder.getServiceInfo(serviceName, groupName, clusterString);
             if (null == serviceInfo || !clientProxy.isSubscribed(serviceName, groupName, clusterString)) {
+                // 如果本地缓存不存在服务信息，则进行订阅
                 serviceInfo = clientProxy.subscribe(serviceName, groupName, clusterString);
             }
         } else {
+            // 如果未订阅服务信息，则直接去服务器进行查询
             serviceInfo = clientProxy.queryInstancesOfService(serviceName, groupName, clusterString, 0, false);
         }
         List<Instance> list;
@@ -392,15 +396,21 @@ public class NacosNamingService implements NamingService {
     public Instance selectOneHealthyInstance(String serviceName, String groupName, List<String> clusters,
             boolean subscribe) throws NacosException {
         String clusterString = StringUtils.join(clusters, ",");
+        // 订阅模式
         if (subscribe) {
+            // 从本地缓存中获取ServiceInfo
             ServiceInfo serviceInfo = serviceInfoHolder.getServiceInfo(serviceName, groupName, clusterString);
             if (null == serviceInfo) {
+                // 缓存为空，则订阅
                 serviceInfo = clientProxy.subscribe(serviceName, groupName, clusterString);
             }
+            // 通过负载均衡算法获得其中一个实例
             return Balancer.RandomByWeight.selectHost(serviceInfo);
         } else {
+            // 通过grpc请求Nacos服务端查询
             ServiceInfo serviceInfo = clientProxy
                     .queryInstancesOfService(serviceName, groupName, clusterString, 0, false);
+            // 通过负载均衡算法获得其中一个实例
             return Balancer.RandomByWeight.selectHost(serviceInfo);
         }
     }

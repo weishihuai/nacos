@@ -59,7 +59,7 @@ public class Balancer {
          * @return random instance
          */
         public static Instance selectHost(ServiceInfo dom) {
-            
+            // 获取服务所有的实例
             List<Instance> hosts = selectAll(dom);
             
             if (CollectionUtils.isEmpty(hosts)) {
@@ -78,18 +78,23 @@ public class Balancer {
      */
     protected static Instance getHostByRandomWeight(List<Instance> hosts) {
         NAMING_LOGGER.debug("entry randomWithWeight");
+        // 实例列表为空，直接返回
         if (hosts == null || hosts.size() == 0) {
             NAMING_LOGGER.debug("hosts == null || hosts.size() == 0");
             return null;
         }
         NAMING_LOGGER.debug("new Chooser");
+
+        // 重新组织数据格式：Instance列表及其中的权重数据进行转换，封装成一个Pair
         List<Pair<Instance>> hostsWithWeight = new ArrayList<>();
         for (Instance host : hosts) {
+            // 只使用健康的实例
             if (host.isHealthy()) {
                 hostsWithWeight.add(new Pair<Instance>(host, host.getWeight()));
             }
         }
         NAMING_LOGGER.debug("for (Host host : hosts)");
+        // 通过Chooser来实现随机权重负载均衡算法
         Chooser<String, Instance> vipChooser = new Chooser<>("www.taobao.com");
         vipChooser.refresh(hostsWithWeight);
         NAMING_LOGGER.debug("vipChooser.refresh");

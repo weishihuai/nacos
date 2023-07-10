@@ -176,6 +176,7 @@ public class NamingClientProxyDelegate implements NamingClientProxy {
         // 如果集群名称非空，拼接上clusters
         String serviceKey = ServiceInfo.getKey(serviceNameWithGroup, clusters);
         // 调度更新，往线程池中提交一个UpdateTask任务，持续更新订阅服务的注册表
+        // 这个定时任务主要的作用就是来定时同步服务器端的实例列表信息，并进行本地缓存更新等操作。
         serviceInfoUpdateService.scheduleUpdateIfAbsent(serviceName, groupName, clusters);
         // 获取缓存中的服务信息
         ServiceInfo result = serviceInfoHolder.getServiceInfoMap().get(serviceKey);
@@ -183,7 +184,7 @@ public class NamingClientProxyDelegate implements NamingClientProxy {
             // 缓存中不存在对应的服务信息 或者 SubscriberRedoData还未注册，则执行订阅
             result = grpcClientProxy.subscribe(serviceName, groupName, clusters);
         }
-        // 处理服务信息：获取老的服务信息，将新的服务信息重新存入客户端缓存中，对比新的服务信息，如发生变更，则发布实例变更数据，并同步serviceInfo数据到本地文件
+        // 处理服务信息：获取本地内存中旧的ServiceInfo服务信息，将最新的ServiceInfo服务信息重新存入客户端缓存中，对比新的服务信息，如发生变更，则发布实例变更数据，并同步serviceInfo数据到本地文件
         serviceInfoHolder.processServiceInfo(result);
         return result;
     }

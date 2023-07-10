@@ -75,15 +75,19 @@ public class FailoverReactor implements Closeable {
     private final ScheduledExecutorService executorService;
     
     public FailoverReactor(ServiceInfoHolder serviceInfoHolder, String cacheDir) {
+        // 持有ServiceInfoHolder引用
         this.serviceInfoHolder = serviceInfoHolder;
+        // 拼接故障根目录：${user.home}/nacos/naming/public/failover
         this.failoverDir = cacheDir + FAILOVER_DIR;
-        // init executorService
+        // 初始化executorService
         this.executorService = new ScheduledThreadPoolExecutor(1, r -> {
             Thread thread = new Thread(r);
+            // 守护线程模式运行
             thread.setDaemon(true);
             thread.setName("com.alibaba.nacos.naming.failover");
             return thread;
         });
+        // 其他初始化操作，通过executorService开启多个定时任务执行
         this.init();
     }
     
@@ -91,12 +95,14 @@ public class FailoverReactor implements Closeable {
      * Init.
      */
     public void init() {
-        
+
+        // 初始化立即执行，执行间隔5秒，执行任务为SwitchRefresher
         executorService.scheduleWithFixedDelay(new SwitchRefresher(), 0L, 5000L, TimeUnit.MILLISECONDS);
-        
+
+        // 初始化延迟30分钟执行，执行间隔24小时，执行任务为DiskFileWriter
         executorService.scheduleWithFixedDelay(new DiskFileWriter(), 30, DAY_PERIOD_MINUTES, TimeUnit.MINUTES);
         
-        // backup file on startup if failover directory is empty.
+        // 初始化立即执行，执行间隔10秒，执行核心操作为DiskFileWriter
         executorService.schedule(() -> {
             try {
                 File cacheDir = new File(failoverDir);
@@ -146,6 +152,7 @@ public class FailoverReactor implements Closeable {
         public void run() {
             try {
                 File switchFile = Paths.get(failoverDir, UtilAndComs.FAILOVER_SWITCH).toFile();
+                //  如果故障转移文件不存在，则直接返回
                 if (!switchFile.exists()) {
                     switchParams.put(FAILOVER_MODE_PARAM, Boolean.FALSE.toString());
                     NAMING_LOGGER.debug("failover switch is not found, {}", switchFile.getName());
@@ -153,9 +160,10 @@ public class FailoverReactor implements Closeable {
                 }
                 
                 long modified = switchFile.lastModified();
-                
+                // 比较文件修改时间，如果已经修改，则获取故障转移文件中的内容
                 if (lastModifiedMillis < modified) {
                     lastModifiedMillis = modified;
+                    // 获取故障转移文件内容
                     String failover = ConcurrentDiskUtil.getFileContent(switchFile.getPath(),
                             Charset.defaultCharset().toString());
                     if (!StringUtils.isEmpty(failover)) {
@@ -163,11 +171,14 @@ public class FailoverReactor implements Closeable {
                         
                         for (String line : lines) {
                             String line1 = line.trim();
+                            // 1表示开启故障转移模式
                             if (IS_FAILOVER_MODE.equals(line1)) {
                                 switchParams.put(FAILOVER_MODE_PARAM, Boolean.TRUE.toString());
                                 NAMING_LOGGER.info("failover-mode is on");
+                                // 执行线程FailoverFileReader
                                 new FailoverFileReader().run();
                             } else if (NO_FAILOVER_MODE.equals(line1)) {
+                                // 0表示关闭故障转移模式
                                 switchParams.put(FAILOVER_MODE_PARAM, Boolean.FALSE.toString());
                                 NAMING_LOGGER.info("failover-mode is off");
                             }
@@ -191,8 +202,12 @@ public class FailoverReactor implements Closeable {
             
             BufferedReader reader = null;
             try {
-                
+                // 读取failover目录存储ServiceInfo的文件内容，然后转换成ServiceInfo，
+                // 并用将所有的ServiceInfo存储在FailoverReactor的serviceMap属性中
+
+                // 读取failover目录下的所有文件，进行遍历处理
                 File cacheDir = new File(failoverDir);
+                // 如果文件不存在，跳过
                 if (!cacheDir.exists() && !cacheDir.mkdirs()) {
                     throw new IllegalStateException("failed to create cache dir: " + failoverDir);
                 }
@@ -206,7 +221,8 @@ public class FailoverReactor implements Closeable {
                     if (!file.isFile()) {
                         continue;
                     }
-                    
+
+                    // 如果是故障转移标志文件，则跳过
                     if (file.getName().equals(UtilAndComs.FAILOVER_SWITCH)) {
                         continue;
                     }
@@ -222,6 +238,7 @@ public class FailoverReactor implements Closeable {
                         String json;
                         if ((json = reader.readLine()) != null) {
                             try {
+                                // 读取文件中的json内容，转化为ServiceInfo对象
                                 dom = JacksonUtils.toObj(json, ServiceInfo.class);
                             } catch (Exception e) {
                                 NAMING_LOGGER.error("[NA] error while parsing cached dom : {}", json, e);
@@ -239,6 +256,7 @@ public class FailoverReactor implements Closeable {
                             //ignore
                         }
                     }
+                    // 将ServiceInfo对象放入domMap当中
                     if (dom != null && !CollectionUtils.isEmpty(dom.getHosts())) {
                         domMap.put(dom.getKey(), dom);
                     }
@@ -246,7 +264,8 @@ public class FailoverReactor implements Closeable {
             } catch (Exception e) {
                 NAMING_LOGGER.error("[NA] failed to read cache file", e);
             }
-            
+
+            // 如果domMap不为空，则将其赋值给serviceMap
             if (domMap.size() > 0) {
                 serviceMap = domMap;
             }
@@ -257,6 +276,8 @@ public class FailoverReactor implements Closeable {
         
         @Override
         public void run() {
+            // 获取ServiceInfoHolder中缓存的ServiceInfo，判断是否满足写入磁盘文件，如果满足，
+            // 则将其写入前面拼接的故障转移目录：${user.home}/nacos/naming/public/failover
             Map<String, ServiceInfo> map = serviceInfoHolder.getServiceInfoMap();
             for (Map.Entry<String, ServiceInfo> entry : map.entrySet()) {
                 ServiceInfo serviceInfo = entry.getValue();
@@ -267,7 +288,7 @@ public class FailoverReactor implements Closeable {
                         .equals(serviceInfo.getName(), UtilAndComs.ALL_HOSTS)) {
                     continue;
                 }
-                
+                // 将缓存内容写入磁盘文件
                 DiskCache.write(serviceInfo, failoverDir);
             }
         }

@@ -140,6 +140,9 @@ public class DefaultPublisher extends Thread implements EventPublisher {
             int waitTimes = 60;
             // To ensure that messages are not lost, enable EventHandler when
             // waiting for the first Subscriber to register
+
+            // 延时效果，也就是说线程启动时最大延时60秒，在这60秒中每隔1秒判断一下当前线程是否关闭，
+            // 是否有订阅者，是否超过60秒。如果满足一个条件，就可以提前跳出死循环。
             while (!shutdown && !hasSubscriber() && waitTimes > 0) {
                 ThreadUtils.sleep(1000L);
                 waitTimes--;

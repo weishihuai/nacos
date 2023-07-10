@@ -45,6 +45,7 @@ import static com.alibaba.nacos.client.utils.LogUtils.NAMING_LOGGER;
 
 /**
  * Naming client service information holder.
+ * 服务信息的持有者
  *
  * @author xiweng.yy
  */
@@ -61,24 +62,36 @@ public class ServiceInfoHolder implements Closeable {
     /**
      * 内存注册表
      * key: groupName@@serviceName@@clusterName
+     * value: ServiceInfo，注册服务的信息，其中包含了服务名称、分组名称、集群信息、实例列表信息、上次更新时间等。
      */
     private final ConcurrentMap<String, ServiceInfo> serviceInfoMap;
-    
+
+    /**
+     * 处理故障转移
+     */
     private final FailoverReactor failoverReactor;
     
     private final boolean pushEmptyProtection;
-    
+
+    /**
+     * 用于指定本地缓存的根目录和故障转移的根目录
+     */
     private String cacheDir;
     
     private String notifierEventScope;
     
     public ServiceInfoHolder(String namespace, String notifierEventScope, NacosClientProperties properties) {
+        // 生成缓存目录：默认为${user.home}/nacos/naming/public，
+        // 可以通过System.setProperty("JM.SNAPSHOT.PATH")自定义根目录
         initCacheDir(namespace, properties);
         if (isLoadCacheAtStart(properties)) {
+            // 当配置了启动时从缓存文件读取信息时，则会从本地缓存进行加载。
+            // 默认false
             this.serviceInfoMap = new ConcurrentHashMap<>(DiskCache.read(this.cacheDir));
         } else {
             this.serviceInfoMap = new ConcurrentHashMap<>(16);
         }
+        // 初始化完cacheDir目录之后，故障转移信息也存储在该目录下。
         this.failoverReactor = new FailoverReactor(this, cacheDir);
         this.pushEmptyProtection = isPushEmptyProtect(properties);
         this.notifierEventScope = notifierEventScope;
@@ -131,6 +144,7 @@ public class ServiceInfoHolder implements Closeable {
         String groupedServiceName = NamingUtils.getGroupedName(serviceName, groupName);
         // 如果指定了集群，那么key还会加上"@@clusters"
         String key = ServiceInfo.getKey(groupedServiceName, clusters);
+        // 如果开启了故障转移，则会优先调用failoverReactor#getService方法
         if (failoverReactor.isFailoverSwitch()) {
             return failoverReactor.getService(key);
         }
@@ -162,13 +176,13 @@ public class ServiceInfoHolder implements Closeable {
         if (serviceKey == null) {
             return null;
         }
-        // 获取老的服务
+        // 获取旧的ServiceInfo服务信息
         ServiceInfo oldService = serviceInfoMap.get(serviceInfo.getKey());
         if (isEmptyOrErrorPush(serviceInfo)) {
             //empty or error push, just ignore
             return oldService;
         }
-        // 重新存入客户端缓存中
+        // 重新存入客户端缓存中，更新内存中的ServiceInfo缓存
         serviceInfoMap.put(serviceInfo.getKey(), serviceInfo);
         // 对比下服务信息是否发生变更
         boolean changed = isChangedServiceInfo(oldService, serviceInfo);
