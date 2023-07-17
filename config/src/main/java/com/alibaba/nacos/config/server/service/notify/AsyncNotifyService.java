@@ -83,10 +83,10 @@ public class AsyncNotifyService {
     public AsyncNotifyService(ServerMemberManager memberManager) {
         this.memberManager = memberManager;
         
-        // Register ConfigDataChangeEvent to NotifyCenter.
+        // 注册ConfigDataChangeEvent到NotifyCenter.
         NotifyCenter.registerToPublisher(ConfigDataChangeEvent.class, NotifyCenter.ringBufferSize);
         
-        // Register A Subscriber to subscribe ConfigDataChangeEvent.
+        // 注册一个订阅ConfigDataChangeEvent事件的处理类
         NotifyCenter.registerSubscriber(new Subscriber() {
             
             @Override
@@ -100,10 +100,11 @@ public class AsyncNotifyService {
                     String tenant = evt.tenant;
                     String tag = evt.tag;
                     MetricsMonitor.incrementConfigChangeCount(tenant, group, dataId);
-                    
+
+                    // 获取所有的Nacos服务节点（包括当前客户端）
                     Collection<Member> ipList = memberManager.allMembers();
                     
-                    // In fact, any type of queue here can be
+                    // 创建一个队列，将相关配置的其他服务节点都存放进来
                     Queue<NotifySingleRpcTask> rpcQueue = new LinkedList<>();
                     
                     for (Member member : ipList) {
@@ -113,6 +114,8 @@ public class AsyncNotifyService {
                                         member));
                     }
                     if (!rpcQueue.isEmpty()) {
+                        // 通过线程池执行异步通知
+                        // AsyncRpcTask实现了runnable接口，关注其run方法
                         ConfigExecutor.executeAsyncNotify(new AsyncRpcTask(rpcQueue));
                     }
                     
@@ -135,14 +138,16 @@ public class AsyncNotifyService {
         private Queue<NotifySingleRpcTask> queue;
         
         public AsyncRpcTask(Queue<NotifySingleRpcTask> queue) {
+            // 构造方法放入rpcTask的队列
             this.queue = queue;
         }
         
         @Override
         public void run() {
             while (!queue.isEmpty()) {
+                // 从队列中取出任务
                 NotifySingleRpcTask task = queue.poll();
-                
+                // 构造配置变动集群同步请求
                 ConfigChangeClusterSyncRequest syncRequest = new ConfigChangeClusterSyncRequest();
                 syncRequest.setDataId(task.getDataId());
                 syncRequest.setGroup(task.getGroup());
@@ -151,7 +156,10 @@ public class AsyncNotifyService {
                 syncRequest.setTag(task.tag);
                 syncRequest.setBatch(task.isBatch);
                 syncRequest.setTenant(task.getTenant());
+
+                // 通知的目标节点
                 Member member = task.member;
+                // 如果是当前节点，直接调用dumpService执行dump操作
                 if (memberManager.getSelf().equals(member)) {
                     if (syncRequest.isBeta()) {
                         dumpService.dumpBeta(syncRequest.getDataId(), syncRequest.getGroup(), syncRequest.getTenant(),
@@ -171,18 +179,19 @@ public class AsyncNotifyService {
                 String event = getNotifyEvent(task);
                 
                 if (memberManager.hasMember(member.getAddress())) {
-                    // start the health check and there are ips that are not monitored, put them directly in the notification queue, otherwise notify
+                    // 启动健康检查，有IP未被监控，直接放入通知队列，否则通知
                     boolean unHealthNeedDelay = isUnHealthy(member.getAddress());
                     if (unHealthNeedDelay) {
-                        // target ip is unhealthy, then put it in the notification list
+                        // 目标 IP 运行状况不健康，然后将其放入通知列表中
                         ConfigTraceService.logNotifyEvent(task.getDataId(), task.getGroup(), task.getTenant(), null,
                                 task.getLastModified(), InetUtils.getSelfIP(), event,
                                 ConfigTraceService.NOTIFY_TYPE_UNHEALTH, 0, member.getAddress());
-                        // get delay time and set fail count to the task
+
+                        // 异步任务执行
+                        // 可延迟的处理，因为是不健康的节点，不知道什么时候能恢复
                         asyncTaskExecute(task);
                     } else {
-                        
-                        // grpc report data change only
+                        // 发送grpc请求
                         try {
                             configClusterRpcClientProxy.syncConfigChange(member, syncRequest,
                                     new AsyncRpcNotifyCallBack(task));
@@ -253,6 +262,7 @@ public class AsyncNotifyService {
     }
     
     private void asyncTaskExecute(NotifySingleRpcTask task) {
+        // 随着失败次数的增加，延迟不断加大，不过当达到最大失败次数后，就不会再增加，以一个固定的时间去触发。最大时间间隔是500ms + 7 * 7 * 1000ms
         int delay = getDelayTime(task);
         Queue<NotifySingleRpcTask> queue = new LinkedList<>();
         queue.add(task);
@@ -345,6 +355,7 @@ public class AsyncNotifyService {
      */
     private static int getDelayTime(NotifyTask task) {
         int failCount = task.getFailCount();
+        // 最大时间间隔是500ms + 7 * 7 * 1000ms
         int delay = MIN_RETRY_INTERVAL + failCount * failCount * INCREASE_STEPS;
         if (failCount <= MAX_COUNT) {
             task.setFailCount(failCount + 1);

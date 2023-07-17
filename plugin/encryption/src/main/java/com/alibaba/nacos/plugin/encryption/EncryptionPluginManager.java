@@ -42,6 +42,7 @@ public class EncryptionPluginManager {
     private static final EncryptionPluginManager INSTANCE = new EncryptionPluginManager();
     
     private EncryptionPluginManager() {
+        // 初始化: 根据自己写的扩展机制，获取EncryptionPluginService，然后再进行反射初始化。
         loadInitial();
     }
     
@@ -49,6 +50,7 @@ public class EncryptionPluginManager {
      * Load initial.
      */
     private void loadInitial() {
+        // 通过NacosServiceLoader扩展机制，获取EncryptionPluginService加密处理类的集合
         Collection<EncryptionPluginService> encryptionPluginServices = NacosServiceLoader.load(
                 EncryptionPluginService.class);
         for (EncryptionPluginService encryptionPluginService : encryptionPluginServices) {
@@ -57,6 +59,7 @@ public class EncryptionPluginManager {
                         + " Please Add algorithmName to resolve.", encryptionPluginService.getClass());
                 continue;
             }
+            // 放入集合
             ENCRYPTION_SPI_MAP.put(encryptionPluginService.algorithmName(), encryptionPluginService);
             LOGGER.info("[EncryptionPluginManager] Load EncryptionPluginService({}) algorithmName({}) successfully.",
                     encryptionPluginService.getClass(), encryptionPluginService.algorithmName());

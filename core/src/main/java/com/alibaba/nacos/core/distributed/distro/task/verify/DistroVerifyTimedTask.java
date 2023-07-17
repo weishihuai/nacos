@@ -50,6 +50,7 @@ public class DistroVerifyTimedTask implements Runnable {
     @Override
     public void run() {
         try {
+            // 所有其他节点
             List<Member> targetServer = serverMemberManager.allMembersWithoutSelf();
             if (Loggers.DISTRO.isDebugEnabled()) {
                 Loggers.DISTRO.debug("server list is: {}", targetServer);

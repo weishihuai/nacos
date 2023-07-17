@@ -85,9 +85,11 @@ public class CacheData {
         }
         return scheduledExecutor;
     }
-    
+
+    // 是否初始化快照
     static boolean initSnapshot;
-    
+
+    // 静态块，获取属性值
     static {
         initSnapshot = NacosClientProperties.PROTOTYPE.getBoolean("nacos.cache.data.init.snapshot", true);
         LOGGER.info("nacos.cache.data.init.snapshot = {} ", initSnapshot);
@@ -96,34 +98,39 @@ public class CacheData {
     private final String envName;
     
     private final ConfigFilterChainManager configFilterChainManager;
-    
+
+    // dataId
     public final String dataId;
-    
+
+    // group
     public final String group;
-    
+
+    // namespace
     public final String tenant;
-    
+
+    /**
+     * cacheData的监听器列表
+     * 监听配置是在cacheData中配置上监听器，等待触发条件后，进行本地的内容和远程内容的比对，
+     * 如果不一致，调用监听器上的回调逻辑，完成配置的更新通知。
+     */
     private final CopyOnWriteArrayList<ManagerListenerWrap> listeners;
-    
+
+    // 配置信息的md5值，用来判断配置有没有变更
     private volatile String md5;
-    
-    /**
-     * whether use local config.
-     */
+
+    // 是否使用本地缓存
     private volatile boolean isUseLocalConfig = false;
-    
-    /**
-     * last modify time.
-     */
+
+    // 上次配置修改时间
     private volatile long localConfigLastModified;
-    
+
+    // 具体的配置内容
     private volatile String content;
-    
+
+    // 加密数据的key
     private volatile String encryptedDataKey;
-    
-    /**
-     * local cache change timestamp.
-     */
+
+    // 修改时间
     private volatile AtomicLong lastModifiedTs = new AtomicLong(0);
     
     /**
@@ -131,21 +138,20 @@ public class CacheData {
      * to true if receive config change notification.
      */
     private volatile AtomicBoolean receiveNotifyChanged = new AtomicBoolean(false);
-    
+
+    // 任务ID
     private int taskId;
-    
+
+    // 是否初始化
     private volatile boolean isInitializing = true;
-    
-    /**
-     * if is cache data md5 sync with the server.
-     */
-    private volatile AtomicBoolean isConsistentWithServer = new AtomicBoolean();
-    
-    /**
-     * if is cache data is discard,need to remove.
-     */
+
+    // 是否和服务端同步
+   private volatile AtomicBoolean isConsistentWithServer = new AtomicBoolean();
+
+    // 是否丢失
     private volatile boolean isDiscard = false;
-    
+
+    // 类型
     private String type;
     
     public boolean isInitializing() {
@@ -311,10 +317,13 @@ public class CacheData {
     public String toString() {
         return "CacheData [" + dataId + ", " + group + "]";
     }
-    
+
+    // cacheData的校验方法
     void checkListenerMd5() {
+        // 遍历这个配置对应的所有的监听者
         for (ManagerListenerWrap wrap : listeners) {
             if (!md5.equals(wrap.lastCallMd5)) {
+                // 如果内容变动了，直接通知监听器处理，并且更新 listenerWrap 中的 content、Md5
                 safeNotifyListener(dataId, group, content, type, md5, encryptedDataKey, wrap);
             }
         }
@@ -391,6 +400,7 @@ public class CacheData {
     
     private void safeNotifyListener(final String dataId, final String group, final String content, final String type,
             final String md5, final String encryptedDataKey, final ManagerListenerWrap listenerWrap) {
+        // 获取到监听器
         final Listener listener = listenerWrap.listener;
         if (listenerWrap.inNotifying) {
             LOGGER.warn(
@@ -398,6 +408,8 @@ public class CacheData {
                     envName, dataId, group, tenant, md5, listener);
             return;
         }
+
+        // 定义一个通知任务
         NotifyTask job = new NotifyTask() {
             
             @Override
@@ -409,6 +421,7 @@ public class CacheData {
                 
                 try {
                     if (listener instanceof AbstractSharedListener) {
+                        // 扩展点，像spring cloud alibaba就用到，创建了NacosContextRefresher
                         AbstractSharedListener adapter = (AbstractSharedListener) listener;
                         adapter.fillContext(dataId, group);
                         LOGGER.info("[{}] [notify-context] dataId={}, group={},tenant={}, md5={}", envName, dataId,
@@ -431,16 +444,22 @@ public class CacheData {
                                     notifyWarnTimeout, Thread.currentThread()), notifyWarnTimeout,
                             TimeUnit.MILLISECONDS);
                     listenerWrap.inNotifying = true;
+
+                    // 回调通知，也就是通知变动的内容
+                    // 这里就是执行前面说到的注册监听时的一个回调函数，里面其实最主要的就是发布了一个RefreshEvent事件，springcloud会处理这个事件
                     listener.receiveConfigInfo(contentTmp);
+
                     // compare lastContent and content
                     if (listener instanceof AbstractConfigChangeListener) {
+                        // 扩展点，告知配置内容的变动
                         Map<String, ConfigChangeItem> data = ConfigChangeHandler.getInstance()
                                 .parseChangeData(listenerWrap.lastContent, contentTmp, type);
                         ConfigChangeEvent event = new ConfigChangeEvent(data);
                         ((AbstractConfigChangeListener) listener).receiveConfigChange(event);
                         listenerWrap.lastContent = contentTmp;
                     }
-                    
+
+                    // 赋值最新的md5
                     listenerWrap.lastCallMd5 = md5;
                     LOGGER.info(
                             "[{}] [notify-ok] dataId={}, group={},tenant={}, md5={}, listener={} ,job run cost={} millis.",
@@ -464,6 +483,7 @@ public class CacheData {
         };
         
         try {
+            // 监听器配置了异步执行器，就异步执行
             if (null != listener.getExecutor()) {
                 LOGGER.info(
                         "[{}] [notify-listener] task submitted to user executor, dataId={}, group={},tenant={}, md5={}, listener={} ",
@@ -471,6 +491,7 @@ public class CacheData {
                 job.async = true;
                 listener.getExecutor().execute(job);
             } else {
+                // 同步执行
                 LOGGER.info(
                         "[{}] [notify-listener] task execute in nacos thread, dataId={}, group={},tenant={}, md5={}, listener={} ",
                         envName, dataId, group, tenant, md5, listener);

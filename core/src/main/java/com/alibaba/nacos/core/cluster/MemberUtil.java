@@ -169,7 +169,9 @@ public class MemberUtil {
     }
     
     public static void onFail(final ServerMemberManager manager, final Member member) {
-        // To avoid null pointer judgments, pass in one NONE_EXCEPTION
+        // 若请求接口失败直接将当前成员状态设置为SUSPICIOUS，
+        // 若访问失败次数大于最大失败访问次数，或Connection refused则将当前成员状态置为DOWN
+        // 若状态发生变化则发送MembersChangeEvent事件
         onFail(manager, member, ExceptionUtil.NONE_EXCEPTION);
     }
     
@@ -182,17 +184,20 @@ public class MemberUtil {
     public static void onFail(final ServerMemberManager manager, final Member member, Throwable ex) {
         manager.getMemberAddressInfos().remove(member.getAddress());
         final NodeState old = member.getState();
+        // 将当前成员状态设置为SUSPICIOUS，并累加失败访问次数
         member.setState(NodeState.SUSPICIOUS);
         member.setFailAccessCnt(member.getFailAccessCnt() + 1);
+        // 最大访问失败次数，默认为3次
         int maxFailAccessCnt = EnvUtil
                 .getProperty(MEMBER_FAIL_ACCESS_CNT_PROPERTY, Integer.class, DEFAULT_MEMBER_FAIL_ACCESS_CNT);
         
-        // If the number of consecutive failures to access the target node reaches
-        // a maximum, or the link request is rejected, the state is directly down
+        // 若访问失败次数大于最大失败访问次数，或Connection refused则将当前成员状态置为DOWN
         if (member.getFailAccessCnt() > maxFailAccessCnt || StringUtils
                 .containsIgnoreCase(ex.getMessage(), TARGET_MEMBER_CONNECT_REFUSE_ERRMSG)) {
             member.setState(NodeState.DOWN);
         }
+
+        // 状态若发送变化则发送MembersChangeEvent事件
         if (!Objects.equals(old, member.getState())) {
             manager.notifyMemberChange(member);
         }

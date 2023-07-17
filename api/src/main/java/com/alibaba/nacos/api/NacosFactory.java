@@ -41,6 +41,7 @@ public class NacosFactory {
      * @throws NacosException Exception
      */
     public static ConfigService createConfigService(Properties properties) throws NacosException {
+        // 通过反射创建NacosConfigService
         return ConfigFactory.createConfigService(properties);
     }
     

@@ -116,8 +116,10 @@ public class NacosClusterController {
             return RestResultUtils.failedWithMsg(400, "Node information is illegal");
         }
         LoggerUtils.printIfDebugEnabled(Loggers.CLUSTER, "node state report, receive info : {}", node);
+        // 将收到的成员状态置为UP，失败访问次数置为0
         node.setState(NodeState.UP);
         node.setFailAccessCnt(0);
+        // 调用ServerMemberManager的update方法将信息更新到serverList和healthyList中
         memberManager.update(node);
         return RestResultUtils.success(JacksonUtils.toJson(memberManager.getSelf()));
     }

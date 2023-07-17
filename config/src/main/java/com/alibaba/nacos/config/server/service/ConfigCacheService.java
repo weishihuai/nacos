@@ -100,9 +100,11 @@ public class ConfigCacheService {
         String groupKey = GroupKey2.getKey(dataId, group, tenant);
         CacheItem ci = makeSure(groupKey, encryptedDataKey);
         ci.setType(type);
+        // 获取写锁
         final int lockResult = tryWriteLock(groupKey);
         assert (lockResult != 0);
-        
+
+        // 获取锁失败
         if (lockResult < 0) {
             DUMP_LOG.warn("[dump-error] write lock failed. {}", groupKey);
             return false;
@@ -110,15 +112,17 @@ public class ConfigCacheService {
         
         try {
             
-            //check timestamp
+            // 校验配置最后更新时间，如果这个事件滞后了则不处理了
             boolean lastModifiedOutDated = lastModifiedTs < ConfigCacheService.getLastModifiedTs(groupKey);
+            // 小于本地缓存中的最后更新时间，说明滞后了，不处理
             if (lastModifiedOutDated) {
                 DUMP_LOG.warn("[dump-ignore] timestamp is outdated,groupKey={}", groupKey);
                 return true;
             }
             
             boolean newLastModified = lastModifiedTs > ConfigCacheService.getLastModifiedTs(groupKey);
-            
+
+            // 计算配置信息的md5值
             if (md5 == null) {
                 md5 = MD5Utils.md5Hex(content, ENCODE);
             }
@@ -126,6 +130,7 @@ public class ConfigCacheService {
             //check md5 & update local disk cache.
             String localContentMd5 = ConfigCacheService.getContentMd5(groupKey);
             boolean md5Changed = !md5.equals(localContentMd5);
+            // 如果配置内容发生变更，需要保存到磁盘
             if (md5Changed) {
                 if (!PropertyUtil.isDirectRead()) {
                     DUMP_LOG.info("[dump] md5 changed, save to disk cache ,groupKey={}, newMd5={},oldMd5={}", groupKey,
@@ -144,11 +149,13 @@ public class ConfigCacheService {
                 DUMP_LOG.info(
                         "[dump] md5 changed, update md5 and timestamp in jvm cache ,groupKey={}, newMd5={},oldMd5={},lastModifiedTs={}",
                         groupKey, md5, localContentMd5, lastModifiedTs);
+                // 如果配置内容发生变更，需要更新MD5值，更新本地内存中的配置信息，并发布本地配置变更事件
                 updateMd5(groupKey, md5, lastModifiedTs, encryptedDataKey);
             } else if (newLastModified) {
                 DUMP_LOG.info(
                         "[dump] md5 consistent ,timestamp changed, update timestamp only in jvm cache ,groupKey={},lastModifiedTs={}",
                         groupKey, lastModifiedTs);
+                // 设置缓存中配置最后变更时间
                 updateTimeStamp(groupKey, lastModifiedTs, encryptedDataKey);
             } else {
                 DUMP_LOG.warn(
@@ -170,6 +177,7 @@ public class ConfigCacheService {
             }
             return false;
         } finally {
+            // 释放写锁
             releaseWriteLock(groupKey);
         }
         
@@ -307,13 +315,14 @@ public class ConfigCacheService {
             long localTagLastModifiedTs = ConfigCacheService.getTagLastModifiedTs(groupKey, tag);
             
             boolean timestampOutdated = lastModifiedTs < localTagLastModifiedTs;
+            // 如果这个事件滞后了则不处理了
             if (timestampOutdated) {
                 DUMP_LOG.warn("[dump-tag-ignore] timestamp is outdated,groupKey={}", groupKey);
                 return true;
             }
             
             boolean timestampChanged = lastModifiedTs > localTagLastModifiedTs;
-            
+            // 计算配置信息的md5值
             final String md5 = MD5Utils.md5Hex(content, ENCODE_GBK);
             
             String localContentTagMd5 = ConfigCacheService.getContentTagMd5(groupKey, tag);
@@ -525,32 +534,36 @@ public class ConfigCacheService {
      */
     public static boolean remove(String dataId, String group, String tenant) {
         final String groupKey = GroupKey2.getKey(dataId, group, tenant);
+        // 获取写锁
         final int lockResult = tryWriteLock(groupKey);
-        
-        // If data is non-existent.
+
+        // 如果数据不存在了
         if (0 == lockResult) {
             DUMP_LOG.info("[remove-ok] {} not exist.", groupKey);
             return true;
         }
-        
-        // try to lock failed
+
+        // 获取写锁失败了
         if (lockResult < 0) {
             DUMP_LOG.warn("[remove-error] write lock failed. {}", groupKey);
             return false;
         }
         
         try {
+            // 移除配置
             if (!PropertyUtil.isDirectRead()) {
                 DUMP_LOG.info("[dump] remove  local disk cache,groupKey={} ", groupKey);
                 ConfigDiskServiceFactory.getInstance().removeConfigInfo(dataId, group, tenant);
             }
+            // 移除配置缓存
             CACHE.remove(groupKey);
             DUMP_LOG.info("[dump] remove  local jvm cache,groupKey={} ", groupKey);
-            
+            // 发布本地配置变动通知
             NotifyCenter.publishEvent(new LocalDataChangeEvent(groupKey));
             
             return true;
         } finally {
+            // 释放写锁
             releaseWriteLock(groupKey);
         }
     }

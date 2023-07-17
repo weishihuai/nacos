@@ -71,6 +71,7 @@ public abstract class AbstractDistroExecuteTask extends AbstractExecuteTask {
         try {
             boolean result = doExecute();
             if (!result) {
+                // 失败重试
                 handleFailedTask();
             }
             Loggers.DISTRO.info("[DISTRO-END] {} result: {}", toString(), result);

@@ -136,6 +136,13 @@ public class ConfigController {
     
     /**
      * Adds or updates non-aggregated data.
+     *
+     * 1、加密处理
+     * 2、参数检查
+     * 3、构造配置信息
+     * 4、构造请求对象
+     * 5、发布配置
+     *
      * <p>
      * request and response will be used in aspect, see
      * {@link com.alibaba.nacos.config.server.aspect.CapacityManagementAspect} and
@@ -162,19 +169,21 @@ public class ConfigController {
             @RequestParam(required = false) String encryptedDataKey) throws NacosException {
         
         String encryptedDataKeyFinal = null;
+        // 内容加密
         if (StringUtils.isNotBlank(encryptedDataKey)) {
             encryptedDataKeyFinal = encryptedDataKey;
         } else {
+            // 使用到插件化的思想进行加密
             Pair<String, String> pair = EncryptionHandler.encryptHandler(dataId, content);
             content = pair.getSecond();
             encryptedDataKeyFinal = pair.getFirst();
         }
-        
-        // check tenant
+
+        // 参数检查
         ParamUtils.checkTenant(tenant);
         ParamUtils.checkParam(dataId, group, "datumId", content);
         ParamUtils.checkParam(tag);
-        
+        // 构造配置信息，包括namespaceId、groupId、dataId、配置内容、描述信息等
         ConfigForm configForm = new ConfigForm();
         configForm.setDataId(dataId);
         configForm.setGroup(group);
@@ -196,12 +205,12 @@ public class ConfigController {
         if (!ConfigType.isValidType(type)) {
             configForm.setType(ConfigType.getDefaultType().getType());
         }
-        
+        // 构造请求对象
         ConfigRequestInfo configRequestInfo = new ConfigRequestInfo();
         configRequestInfo.setSrcIp(RequestUtil.getRemoteIp(request));
         configRequestInfo.setRequestIpApp(RequestUtil.getAppName(request));
         configRequestInfo.setBetaIps(request.getHeader("betaIps"));
-        
+        // 发布配置
         return configOperationService.publishConfig(configForm, configRequestInfo, encryptedDataKeyFinal);
     }
     

@@ -54,6 +54,7 @@ public class DistroDataRequestHandler extends RequestHandler<DistroDataRequest, 
                 case ADD:
                 case CHANGE:
                 case DELETE:
+                    // 变更操作: 维护注册表数据，然后发布事件
                     return handleSyncData(request.getDistroData());
                 case QUERY:
                     return handleQueryData(request.getDistroData());
@@ -86,6 +87,7 @@ public class DistroDataRequestHandler extends RequestHandler<DistroDataRequest, 
     
     private DistroDataResponse handleSyncData(DistroData distroData) {
         DistroDataResponse result = new DistroDataResponse();
+        // 调用DistroProtocol.onReceive方法
         if (!distroProtocol.onReceive(distroData)) {
             result.setErrorCode(ResponseCode.FAIL.getCode());
             result.setMessage("[DISTRO-FAILED] distro data handle failed");

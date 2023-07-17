@@ -46,7 +46,7 @@ public class ConfigChangeClusterSyncRequestHandler
     @Override
     public ConfigChangeClusterSyncResponse handle(ConfigChangeClusterSyncRequest configChangeSyncRequest,
             RequestMeta meta) throws NacosException {
-    
+        // 调用到其他节点，其他节点也是执行dump服务，然后通知和本机连接的客户端，通知他们进行配置更新。
         if (configChangeSyncRequest.isBeta()) {
             dumpService.dumpBeta(configChangeSyncRequest.getDataId(), configChangeSyncRequest.getGroup(),
                     configChangeSyncRequest.getTenant(), configChangeSyncRequest.getLastModified(), meta.getClientIp());
@@ -58,6 +58,7 @@ public class ConfigChangeClusterSyncRequestHandler
                     configChangeSyncRequest.getTenant(), configChangeSyncRequest.getTag(),
                     configChangeSyncRequest.getLastModified(), meta.getClientIp());
         } else {
+            // 本机的dump服务
             dumpService.dumpFormal(configChangeSyncRequest.getDataId(), configChangeSyncRequest.getGroup(),
                     configChangeSyncRequest.getTenant(), configChangeSyncRequest.getLastModified(), meta.getClientIp());
         }

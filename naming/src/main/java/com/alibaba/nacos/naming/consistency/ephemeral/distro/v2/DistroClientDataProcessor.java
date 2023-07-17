@@ -50,7 +50,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Distro processor for v2.
+ * 客户端数据一致性处理器
  *
  * @author xiweng.yy
  */
@@ -91,12 +91,14 @@ public class DistroClientDataProcessor extends SmartSubscriber implements Distro
     
     @Override
     public void onEvent(Event event) {
+        // 只有集群模式才有效，单机模式启动的Nacos，不会执行同步操作
         if (EnvUtil.getStandaloneMode()) {
             return;
         }
         if (event instanceof ClientEvent.ClientVerifyFailedEvent) {
             syncToVerifyFailedServer((ClientEvent.ClientVerifyFailedEvent) event);
         } else {
+            // 同步数据给其它节点
             syncToAllServer((ClientEvent) event);
         }
     }
@@ -113,13 +115,20 @@ public class DistroClientDataProcessor extends SmartSubscriber implements Distro
     
     private void syncToAllServer(ClientEvent event) {
         Client client = event.getClient();
+        /**
+         * 判断客户端是否为空，是否是临时实例，判断是否是负责节点
+         *
+         * 临时实例，使用distro协议同步； 持久实例：使用raft协议同步
+         */
         if (isInvalidClient(client)) {
             return;
         }
         if (event instanceof ClientEvent.ClientDisconnectEvent) {
+            // 客户端断开连接事件
             DistroKey distroKey = new DistroKey(client.getClientId(), TYPE);
             distroProtocol.sync(distroKey, DataOperation.DELETE);
         } else if (event instanceof ClientEvent.ClientChangedEvent) {
+            // 客户端变更事件（新增或修改）
             DistroKey distroKey = new DistroKey(client.getClientId(), TYPE);
             distroProtocol.sync(distroKey, DataOperation.CHANGE);
         }
@@ -140,8 +149,10 @@ public class DistroClientDataProcessor extends SmartSubscriber implements Distro
         switch (distroData.getType()) {
             case ADD:
             case CHANGE:
+                // 反序列化同步数据为ClientSyncData
                 ClientSyncData clientSyncData = ApplicationUtils.getBean(Serializer.class)
                         .deserialize(distroData.getContent(), ClientSyncData.class);
+                // 处理同步数据
                 handlerClientSyncData(clientSyncData);
                 return true;
             case DELETE:
@@ -158,8 +169,11 @@ public class DistroClientDataProcessor extends SmartSubscriber implements Distro
         Loggers.DISTRO
                 .info("[Client-Add] Received distro client sync data {}, revision={}", clientSyncData.getClientId(),
                         clientSyncData.getAttributes().getClientAttribute(ClientConstants.REVISION, 0L));
+        // 同步客户端连接，生成client：不存在时创建client
         clientManager.syncClientConnected(clientSyncData.getClientId(), clientSyncData.getAttributes());
+        // 获取Client
         Client client = clientManager.getClient(clientSyncData.getClientId());
+        // 更新Client数据
         upgradeClient(client, clientSyncData);
     }
     
@@ -178,6 +192,7 @@ public class DistroClientDataProcessor extends SmartSubscriber implements Distro
             syncedService.add(singleton);
             InstancePublishInfo instancePublishInfo = instances.get(i);
             if (!instancePublishInfo.equals(client.getInstancePublishInfo(singleton))) {
+                // 添加注册表信息，并发布ClientRegisterServiceEvent
                 client.addServiceInstance(singleton, instancePublishInfo);
                 NotifyCenter.publishEvent(
                         new ClientOperationEvent.ClientRegisterServiceEvent(singleton, client.getClientId()));
@@ -185,6 +200,7 @@ public class DistroClientDataProcessor extends SmartSubscriber implements Distro
         }
         for (Service each : client.getAllPublishedService()) {
             if (!syncedService.contains(each)) {
+                // 删除注册表信息，并发布ClientDeregisterServiceEvent
                 client.removeServiceInstance(each);
                 NotifyCenter.publishEvent(
                         new ClientOperationEvent.ClientDeregisterServiceEvent(each, client.getClientId()));
@@ -252,6 +268,7 @@ public class DistroClientDataProcessor extends SmartSubscriber implements Distro
         if (null == client) {
             return null;
         }
+        // 把生成的同步数据放入到数组中
         byte[] data = ApplicationUtils.getBean(Serializer.class).serialize(client.generateSyncData());
         return new DistroData(distroKey, data);
     }

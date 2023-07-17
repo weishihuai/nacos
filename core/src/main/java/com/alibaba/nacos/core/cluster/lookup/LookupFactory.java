@@ -50,11 +50,14 @@ public final class LookupFactory {
      */
     public static MemberLookup createLookUp(ServerMemberManager memberManager) throws NacosException {
         if (!EnvUtil.getStandaloneMode()) {
+            // 集群模式: 根据lookupType来创建具体的MemberLookup来加载集群成员列表
             String lookupType = EnvUtil.getProperty(LOOKUP_MODE_TYPE);
+            // lookupType默认为null，默认若在nacos.home文件夹下有conf/cluster.conf集群配置文件，则通过FileConfigMemberLookup来加载该配置文件内容
             LookupType type = chooseLookup(lookupType);
             LOOK_UP = find(type);
             currentLookupType = type;
         } else {
+            // 单机模式: 直接创建StandaloneMemberLookup
             LOOK_UP = new StandaloneMemberLookup();
         }
         LOOK_UP.injectMemberManager(memberManager);
@@ -107,6 +110,7 @@ public final class LookupFactory {
     }
     
     private static LookupType chooseLookup(String lookupType) {
+        // 默认lookupType传入的null
         if (StringUtils.isNotBlank(lookupType)) {
             LookupType type = LookupType.sourceOf(lookupType);
             if (Objects.nonNull(type)) {
@@ -114,9 +118,11 @@ public final class LookupFactory {
             }
         }
         File file = new File(EnvUtil.getClusterConfFilePath());
+        // 优先判断cluster.conf是否存在，存在就用文件模式
         if (file.exists() || StringUtils.isNotBlank(EnvUtil.getMemberList())) {
             return LookupType.FILE_CONFIG;
         }
+        // 非文件就用配置文件application.properties的配置地址（application.properties配置nacos.member.list）
         return LookupType.ADDRESS_SERVER;
     }
     

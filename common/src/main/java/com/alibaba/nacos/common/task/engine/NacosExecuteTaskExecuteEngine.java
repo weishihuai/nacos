@@ -70,8 +70,9 @@ public class NacosExecuteTaskExecuteEngine extends AbstractNacosTaskExecuteEngin
             processor.process(task);
             return;
         }
-        // 没有找到处理类的话, 就用公共的TaskExecuteWorker执行
+        // 没有找到处理类的话, 就用公共的TaskExecuteWorker执行（通过hash取模的方式去获取）
         TaskExecuteWorker worker = getWorker(tag);
+        // 使用worker去执行
         worker.process(task);
     }
     

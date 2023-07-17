@@ -65,6 +65,7 @@ public class DistroMapper extends MemberChangeListener {
      */
     @PostConstruct
     public void init() {
+        // 将自身注册为MembersChangeEvent事件订阅者
         NotifyCenter.registerSubscriber(this);
         this.healthyList = MemberUtil.simpleMembers(memberManager.allMembers());
     }
@@ -127,12 +128,12 @@ public class DistroMapper extends MemberChangeListener {
     
     @Override
     public void onEvent(MembersChangeEvent event) {
-        // Here, the node list must be sorted to ensure that all nacos-server's
-        // node list is in the same order
+        // 在这里,节点列表中必须进行排序,以确保所有nacos-server节点列表的顺序相同
         List<String> list = MemberUtil.simpleMembers(MemberUtil.selectTargetMembers(event.getMembers(),
                 member -> NodeState.UP.equals(member.getState()) || NodeState.SUSPICIOUS.equals(member.getState())));
         Collections.sort(list);
         Collection<String> old = healthyList;
+        // 发生MembersChangeEvent事件变更后会更新健康成员列表healthyList
         healthyList = Collections.unmodifiableList(list);
         Loggers.SRV_LOG.info("[NACOS-DISTRO] healthy server list changed, old: {}, new: {}", old, healthyList);
     }

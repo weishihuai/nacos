@@ -174,15 +174,24 @@ public class ClientWorker implements Closeable {
      */
     public void addTenantListeners(String dataId, String group, List<? extends Listener> listeners)
             throws NacosException {
+        // 如果为空，取默认组名DEFAULT_GROUP
         group = blank2defaultGroup(group);
+        // 命名空间ID
         String tenant = agent.getTenant();
+        // 根据dataId,group和tenant获取一个cacheData
         CacheData cache = addCacheDataIfAbsent(dataId, group, tenant);
+
+        // 可以看到，一个配置文件可以有多个监听器
         synchronized (cache) {
+            // 添加监听器
             for (Listener listener : listeners) {
                 cache.addListener(listener);
             }
+            // 非丢弃，删除类型
             cache.setDiscard(false);
+            // 未同步到服务端
             cache.setConsistentWithServer(false);
+            // 处理配置类
             agent.notifyListenConfig();
         }
         
@@ -363,21 +372,22 @@ public class ClientWorker implements Closeable {
      * @return cache data
      */
     public CacheData addCacheDataIfAbsent(String dataId, String group, String tenant) throws NacosException {
+        // 从缓存中获取cacheData
         CacheData cache = getCache(dataId, group, tenant);
         if (null != cache) {
+            // 缓存中存在，则直接返回
             return cache;
         }
         String key = GroupKey.getKeyTenant(dataId, group, tenant);
         synchronized (cacheMap) {
             CacheData cacheFromMap = getCache(dataId, group, tenant);
-            // multiple listeners on the same dataid+group and race condition,so
-            // double check again
-            // other listener thread beat me to set to cacheMap
+            // 双重检查
             if (null != cacheFromMap) {
                 cache = cacheFromMap;
                 // reset so that server not hang this check
                 cache.setInitializing(true);
             } else {
+                // 缓存为空，直接构造一个CacheData
                 cache = new CacheData(configFilterChainManager, agent.getName(), dataId, group, tenant);
                 int taskId = calculateTaskId();
                 increaseTaskIdCount(taskId);
@@ -389,8 +399,10 @@ public class ClientWorker implements Closeable {
                     cache.setContent(response.getContent());
                 }
             }
-            
+
+            // 写时复制思想
             Map<String, CacheData> copy = new HashMap<>(this.cacheMap.get());
+            // 存入缓存
             copy.put(key, cache);
             cacheMap.set(copy);
         }
@@ -446,16 +458,23 @@ public class ClientWorker implements Closeable {
     private String blank2defaultGroup(String group) {
         return StringUtils.isBlank(group) ? Constants.DEFAULT_GROUP : group.trim();
     }
-    
+
+    /**
+     *
+     */
     @SuppressWarnings("PMD.ThreadPoolCreationRule")
     public ClientWorker(final ConfigFilterChainManager configFilterChainManager, ServerListManager serverListManager,
             final NacosClientProperties properties) throws NacosException {
         this.configFilterChainManager = configFilterChainManager;
-        
+
+        // 初始化timeout、taskPenaltyTime、enableRemoteSyncConfig属性
         init(properties);
-        
+
+        // 创建一个用于配置服务端的Rpc通信客户端
         agent = new ConfigRpcTransportClient(properties, serverListManager);
+        // 计算合适的核心线程数
         int count = ThreadUtils.getSuitableThreadCount(THREAD_MULTIPLE);
+        // 初始化一个线程池
         ScheduledExecutorService executorService = Executors.newScheduledThreadPool(Math.max(count, MIN_THREAD_NUM),
                 r -> {
                     Thread t = new Thread(r);
@@ -463,7 +482,9 @@ public class ClientWorker implements Closeable {
                     t.setDaemon(true);
                     return t;
                 });
+        // 配置了一个异步处理线程池
         agent.setExecutor(executorService);
+        // 调用start方法
         agent.start();
         
     }
@@ -571,7 +592,10 @@ public class ClientWorker implements Closeable {
     public class ConfigRpcTransportClient extends ConfigTransportClient {
         
         Map<String, ExecutorService> multiTaskExecutor = new HashMap<>();
-        
+
+        /**
+         * 阻塞队列
+         */
         private final BlockingQueue<Object> listenExecutebell = new ArrayBlockingQueue<>(1);
         
         private Object bellItem = new Object();
@@ -644,10 +668,11 @@ public class ClientWorker implements Closeable {
         
         private void initRpcClientHandler(final RpcClient rpcClientInner) {
             /*
-             * Register Config Change /Config ReSync Handler
+             * 注册了服务端调用客户端的处理方法，注意不是客户端请求，而是客户端接受服务端的请求，因为Grpc是可以双向请求的
              */
             rpcClientInner.registerServerRequestHandler((request) -> {
                 if (request instanceof ConfigChangeNotifyRequest) {
+                    // 服务端推送的请求
                     ConfigChangeNotifyRequest configChangeNotifyRequest = (ConfigChangeNotifyRequest) request;
                     LOGGER.info("[{}] [server-push] config changed. dataId={}, group={},tenant={}",
                             rpcClientInner.getName(), configChangeNotifyRequest.getDataId(),
@@ -658,6 +683,7 @@ public class ClientWorker implements Closeable {
                     CacheData cacheData = cacheMap.get().get(groupKey);
                     if (cacheData != null) {
                         synchronized (cacheData) {
+                            // 推送了数据后，设置最后的更新事件，并且表明和服务端不同步，通知处理
                             cacheData.getReceiveNotifyChanged().set(true);
                             cacheData.setConsistentWithServer(false);
                             notifyListenConfig();
@@ -677,7 +703,8 @@ public class ClientWorker implements Closeable {
                 }
                 return null;
             });
-            
+
+            // 处理连接和断开事件，因为能感应到断开了，所以不需要心跳检测
             rpcClientInner.registerConnectionListener(new ConnectionEventListener() {
                 
                 @Override
@@ -736,18 +763,23 @@ public class ClientWorker implements Closeable {
                     return ServerlistChangeEvent.class;
                 }
             };
+            // 增加订阅服务列表变动事件
             NotifyCenter.registerSubscriber(subscriber);
         }
         
         @Override
         public void startInternal() {
+            // 线程池在阻塞等到信号的到来
             executor.schedule(() -> {
                 while (!executor.isShutdown() && !executor.isTerminated()) {
                     try {
+                        // 获取到listenExecutebell.offer(bellItem)的信号
+                        // 如果没有监听器的变动，则等待5s处理一次
                         listenExecutebell.poll(5L, TimeUnit.SECONDS);
                         if (executor.isShutdown() || executor.isTerminated()) {
                             continue;
                         }
+                        // 执行配置监听
                         executeConfigListen();
                     } catch (Throwable e) {
                         LOGGER.error("[rpc listen execute] [rpc listen] exception", e);
@@ -770,29 +802,35 @@ public class ClientWorker implements Closeable {
         
         @Override
         public void notifyListenConfig() {
+            // listenExecutebell是一个阻塞队列，放入bellItem，即一个触发条件，相当于生产者
             listenExecutebell.offer(bellItem);
         }
         
         @Override
         public void executeConfigListen() {
-            
+            // 存放含有listen的cacheData
             Map<String, List<CacheData>> listenCachesMap = new HashMap<>(16);
+            // 存放不含有listen的cacheData
             Map<String, List<CacheData>> removeListenCachesMap = new HashMap<>(16);
             long now = System.currentTimeMillis();
+            // 当前时间 减去 上一次全量同步的时间，如果大于3分钟，表示到了全量同步的时间了
             boolean needAllSync = now - lastAllSyncTime >= ALL_SYNC_INTERNAL;
             for (CacheData cache : cacheMap.get().values()) {
                 
                 synchronized (cache) {
                     
-                    //check local listeners consistent.
+                    // 是否和服务端一致
                     if (cache.isConsistentWithServer()) {
+                        // 一致则检查md5值，如果md5值和上一个不一样，则说明变动了，需要通知监听器
                         cache.checkListenerMd5();
+                        // 是否到全量同步时间了，未到则直接跳过
                         if (!needAllSync) {
                             continue;
                         }
                     }
                     
                     if (!cache.isDiscard()) {
+                        // 非丢弃型，即新增，放入listenCachesMap
                         //get listen  config
                         if (!cache.isUseLocalConfigInfo()) {
                             List<CacheData> cacheDatas = listenCachesMap.get(String.valueOf(cache.getTaskId()));
@@ -804,7 +842,7 @@ public class ClientWorker implements Closeable {
                             
                         }
                     } else if (cache.isDiscard() && CollectionUtils.isEmpty(cache.getListeners())) {
-                        
+                        // 丢弃型，即删除， 放入removeListenCachesMap
                         if (!cache.isUseLocalConfigInfo()) {
                             List<CacheData> cacheDatas = removeListenCachesMap.get(String.valueOf(cache.getTaskId()));
                             if (cacheDatas == null) {
@@ -819,17 +857,19 @@ public class ClientWorker implements Closeable {
                 
             }
             
-            //execute check listen ,return true if has change keys.
+            // 如果需要和服务端数据同步，则listenCachesMap和removeListenCachesMap存放了本地数据，需要和服务端对比
             boolean hasChangedKeys = checkListenCache(listenCachesMap);
             
             //execute check remove listen.
             checkRemoveListenCache(removeListenCachesMap);
             
             if (needAllSync) {
+                // 更新同步时间
                 lastAllSyncTime = now;
             }
             //If has changed keys,notify re sync md5.
             if (hasChangedKeys) {
+                // 服务端告知了有数据变动，则需要再同步一次
                 notifyListenConfig();
             }
             
@@ -848,6 +888,7 @@ public class ClientWorker implements Closeable {
         }
         
         private void checkRemoveListenCache(Map<String, List<CacheData>> removeListenCachesMap) {
+            // 需要删除的数据不为空
             if (!removeListenCachesMap.isEmpty()) {
                 List<Future> listenFutures = new ArrayList<>();
                 
@@ -858,14 +899,18 @@ public class ClientWorker implements Closeable {
                     Future future = executorService.submit(() -> {
                         List<CacheData> removeListenCaches = entry.getValue();
                         ConfigBatchListenRequest configChangeListenRequest = buildConfigRequest(removeListenCaches);
+                        // 配置需要删除
                         configChangeListenRequest.setListen(false);
                         try {
+                            // 获取rpc客户端
                             RpcClient rpcClient = ensureRpcClient(taskId);
+                            // 通知服务端移除数据
                             boolean removeSuccess = unListenConfigChange(rpcClient, configChangeListenRequest);
                             if (removeSuccess) {
                                 for (CacheData cacheData : removeListenCaches) {
                                     synchronized (cacheData) {
                                         if (cacheData.isDiscard() && cacheData.getListeners().isEmpty()) {
+                                            // 移除缓存
                                             ClientWorker.this.removeCache(cacheData.dataId, cacheData.group,
                                                     cacheData.tenant);
                                         }
@@ -899,6 +944,7 @@ public class ClientWorker implements Closeable {
         private boolean checkListenCache(Map<String, List<CacheData>> listenCachesMap) {
             
             final AtomicBoolean hasChangedKeys = new AtomicBoolean(false);
+            // 新增的处理
             if (!listenCachesMap.isEmpty()) {
                 List<Future> listenFutures = new ArrayList<>();
                 for (Map.Entry<String, List<CacheData>> entry : listenCachesMap.entrySet()) {
@@ -910,9 +956,12 @@ public class ClientWorker implements Closeable {
                         for (CacheData cacheData : listenCaches) {
                             cacheData.getReceiveNotifyChanged().set(false);
                         }
+                        // 构建新增数据的请求参数，此请求用于远程和本地对比，发现变动了会进行通知
                         ConfigBatchListenRequest configChangeListenRequest = buildConfigRequest(listenCaches);
+                        // 配置需要新增或更新监听数据
                         configChangeListenRequest.setListen(true);
                         try {
+                            // 获取一个rpc的客户端
                             RpcClient rpcClient = ensureRpcClient(taskId);
                             ConfigChangeBatchListenResponse listenResponse = (ConfigChangeBatchListenResponse) requestProxy(
                                     rpcClient, configChangeListenRequest);
@@ -923,12 +972,14 @@ public class ClientWorker implements Closeable {
                                 List<ConfigChangeBatchListenResponse.ConfigContext> changedConfigs = listenResponse.getChangedConfigs();
                                 //handle changed keys,notify listener
                                 if (!CollectionUtils.isEmpty(changedConfigs)) {
+                                    // 有变动的数据
                                     hasChangedKeys.set(true);
                                     for (ConfigChangeBatchListenResponse.ConfigContext changeConfig : changedConfigs) {
                                         String changeKey = GroupKey.getKeyTenant(changeConfig.getDataId(),
                                                 changeConfig.getGroup(), changeConfig.getTenant());
                                         changeKeys.add(changeKey);
                                         boolean isInitializing = cacheMap.get().get(changeKey).isInitializing();
+                                        // 刷新配置并通知变动
                                         refreshContentAndCheck(changeKey, !isInitializing);
                                     }
                                     
@@ -953,6 +1004,7 @@ public class ClientWorker implements Closeable {
                                     if (!changeKeys.contains(groupKey)) {
                                         synchronized (cacheData) {
                                             if (!cacheData.getReceiveNotifyChanged().get()) {
+                                                // 缓存数据没有变动，设置为和服务器同步
                                                 cacheData.setConsistentWithServer(true);
                                             }
                                         }
@@ -991,12 +1043,15 @@ public class ClientWorker implements Closeable {
                 Map<String, String> labels = getLabels();
                 Map<String, String> newLabels = new HashMap<>(labels);
                 newLabels.put("taskId", taskId);
+                // 通过工厂创建一个客户端，这里创建了个GrpcSdkClient
                 RpcClient rpcClient = RpcClientFactory.createClient(uuid + "_config-" + taskId, getConnectionType(),
                         newLabels, RpcClientTlsConfig.properties(this.properties));
                 if (rpcClient.isWaitInitiated()) {
+                    // 初始化网络请求处理器
                     initRpcClientHandler(rpcClient);
                     rpcClient.setTenant(getTenant());
                     rpcClient.clientAbilities(initAbilities());
+                    // 启动客户端
                     rpcClient.start();
                 }
                 

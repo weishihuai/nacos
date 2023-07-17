@@ -38,6 +38,7 @@ public class DistroTaskEngineHolder implements DisposableBean {
     
     public DistroTaskEngineHolder(DistroComponentHolder distroComponentHolder) {
         DistroDelayTaskProcessor defaultDelayTaskProcessor = new DistroDelayTaskProcessor(this, distroComponentHolder);
+        // 设置默认的处理器
         delayTaskExecuteEngine.setDefaultTaskProcessor(defaultDelayTaskProcessor);
     }
     

@@ -60,28 +60,35 @@ public class DistroLoadDataTask implements Runnable {
     @Override
     public void run() {
         try {
+            // 加载数据
             load();
             if (!checkCompleted()) {
+                // 若数据加载失败会再次将任务放入线程池中延时30s后再重试同步任务
                 GlobalExecutor.submitLoadDataTask(this, distroConfig.getLoadDataRetryDelayMillis());
             } else {
+                // 加载成功将isInitialized设置为true
                 loadCallback.onSuccess();
                 Loggers.DISTRO.info("[DISTRO-INIT] load snapshot data success");
             }
         } catch (Exception e) {
+            // 异常将isInitialized设置为false
             loadCallback.onFailed(e);
             Loggers.DISTRO.error("[DISTRO-INIT] load snapshot data failed. ", e);
         }
     }
     
     private void load() throws Exception {
+        // 等待成员数据加载完成
         while (memberManager.allMembersWithoutSelf().isEmpty()) {
             Loggers.DISTRO.info("[DISTRO-INIT] waiting server list init...");
             TimeUnit.SECONDS.sleep(1);
         }
+        // 等待缓存实例加载完成
         while (distroComponentHolder.getDataStorageTypes().isEmpty()) {
             Loggers.DISTRO.info("[DISTRO-INIT] waiting distro data storage register...");
             TimeUnit.SECONDS.sleep(1);
         }
+        // 从其他服务端成员加载数据镜像
         for (String each : distroComponentHolder.getDataStorageTypes()) {
             if (!loadCompletedMap.containsKey(each) || !loadCompletedMap.get(each)) {
                 loadCompletedMap.put(each, loadAllDataSnapshotFromRemote(each));
@@ -97,18 +104,22 @@ public class DistroLoadDataTask implements Runnable {
                     resourceType, transportAgent, dataProcessor);
             return false;
         }
+        // 遍历除自己以外的所有其它服务端成员
         for (Member each : memberManager.allMembersWithoutSelf()) {
             long startTime = System.currentTimeMillis();
             try {
                 Loggers.DISTRO.info("[DISTRO-INIT] load snapshot {} from {}", resourceType, each.getAddress());
+                // 通过HTTP接口获取目标成员中的注册服务数据
                 DistroData distroData = transportAgent.getDatumSnapshot(each.getAddress());
                 Loggers.DISTRO.info("[DISTRO-INIT] it took {} ms to load snapshot {} from {} and snapshot size is {}.",
                         System.currentTimeMillis() - startTime, resourceType, each.getAddress(),
                         getDistroDataLength(distroData));
+                // 解析数据并更新到缓存和注册表中
                 boolean result = dataProcessor.processSnapshot(distroData);
                 Loggers.DISTRO
                         .info("[DISTRO-INIT] load snapshot {} from {} result: {}", resourceType, each.getAddress(),
                                 result);
+                // 只要有一个成功则退出循环
                 if (result) {
                     distroComponentHolder.findDataStorage(resourceType).finishInitial();
                     return true;

@@ -89,9 +89,11 @@ public class WatchFileCenter {
         if (NOW_WATCH_JOB_CNT == MAX_WATCH_FILE_JOB) {
             return false;
         }
+        // 通过WatchDirJob对目标路径的文件进行监听，当发生覆盖、修改、创建、数据删除时会触发FileWatcher的onChange方法。
         WatchDirJob job = MANAGER.get(paths);
         if (job == null) {
             job = new WatchDirJob(paths);
+            // job线程异步处理
             job.start();
             MANAGER.put(paths, job);
             NOW_WATCH_JOB_CNT++;
@@ -178,6 +180,7 @@ public class WatchFileCenter {
                     new NameThreadFactory("com.alibaba.nacos.sys.file.watch-" + paths));
             
             try {
+                // 监听指定路径的文件的覆盖、修改、创建、数据删除
                 WatchService service = FILE_SYSTEM.newWatchService();
                 p.register(service, StandardWatchEventKinds.OVERFLOW, StandardWatchEventKinds.ENTRY_MODIFY,
                         StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE);
@@ -216,6 +219,7 @@ public class WatchFileCenter {
                     if (events.isEmpty()) {
                         continue;
                     }
+                    // 文件监控线程池进行处理
                     callBackExecutor.execute(() -> {
                         for (WatchEvent<?> event : events) {
                             WatchEvent.Kind<?> kind = event.kind();
@@ -224,6 +228,7 @@ public class WatchFileCenter {
                             if (StandardWatchEventKinds.OVERFLOW.equals(kind)) {
                                 eventOverflow();
                             } else {
+                                // 处理监控文件时间逻辑
                                 eventProcess(event.context());
                             }
                         }
@@ -237,19 +242,23 @@ public class WatchFileCenter {
         }
         
         private void eventProcess(Object context) {
+            // 构造文件变动事件
             final FileChangeEvent fileChangeEvent = FileChangeEvent.builder().paths(paths).context(context).build();
             final String str = String.valueOf(context);
             for (final FileWatcher watcher : watchers) {
                 if (watcher.interest(str)) {
+                    // 构造触发事件
                     Runnable job = () -> watcher.onChange(fileChangeEvent);
                     Executor executor = watcher.executor();
                     if (executor == null) {
                         try {
+                            // 直接执行
                             job.run();
                         } catch (Throwable ex) {
                             LOGGER.error("File change event callback error : ", ex);
                         }
                     } else {
+                        // 线程池执行
                         executor.execute(job);
                     }
                 }

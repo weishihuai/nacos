@@ -157,12 +157,14 @@ public class ExternalConfigInfoPersistServiceImpl implements ConfigInfoPersistSe
             final Map<String, Object> configAdvanceInfo) {
         return tjt.execute(status -> {
             try {
+                // jdbcTemplate操作，自动插入到数据库表（config_info）中，返回主键id
                 long configId = addConfigInfoAtomic(-1, srcIp, srcUser, configInfo, configAdvanceInfo);
                 String configTags = configAdvanceInfo == null ? null : (String) configAdvanceInfo.get("config_tags");
+                // 新增tag管理
                 addConfigTagsRelation(configId, configTags, configInfo.getDataId(), configInfo.getGroup(),
                         configInfo.getTenant());
                 Timestamp now = new Timestamp(System.currentTimeMillis());
-                
+                // 插入历史数据到表中（his_config_info）
                 historyConfigInfoPersistService.insertConfigHistoryAtomic(0, configInfo, srcIp, srcUser, now, "I");
                 ConfigInfoStateWrapper configInfoCurrent = this.findConfigInfoState(configInfo.getDataId(),
                         configInfo.getGroup(), configInfo.getTenant());
@@ -189,9 +191,12 @@ public class ExternalConfigInfoPersistServiceImpl implements ConfigInfoPersistSe
      */
     public ConfigOperateResult insertOrUpdate(String srcIp, String srcUser, ConfigInfo configInfo,
             Map<String, Object> configAdvanceInfo) {
+        // 没有直接判断是新增还是更新，而且依赖数据库唯一性做检查，重复了（报主键冲突，说明已存在）就做更新。
         try {
+            // 添加配置信息
             return addConfigInfo(srcIp, srcUser, configInfo, configAdvanceInfo);
         } catch (DuplicateKeyException ive) { // Unique constraint conflict
+            // 如果报唯一约束冲突，则更新配置内容
             return updateConfigInfo(configInfo, srcIp, srcUser, configAdvanceInfo);
         }
     }
@@ -209,6 +214,7 @@ public class ExternalConfigInfoPersistServiceImpl implements ConfigInfoPersistSe
     @Override
     public long addConfigInfoAtomic(final long configId, final String srcIp, final String srcUser,
             final ConfigInfo configInfo, Map<String, Object> configAdvanceInfo) {
+        // 取出配置信息
         final String appNameTmp =
                 StringUtils.isBlank(configInfo.getAppName()) ? StringUtils.EMPTY : configInfo.getAppName();
         final String tenantTmp =
@@ -221,24 +227,29 @@ public class ExternalConfigInfoPersistServiceImpl implements ConfigInfoPersistSe
         final String schema = configAdvanceInfo == null ? null : (String) configAdvanceInfo.get("schema");
         final String encryptedDataKey =
                 configInfo.getEncryptedDataKey() == null ? StringUtils.EMPTY : configInfo.getEncryptedDataKey();
-        
+
+        // 将配置内容进行MD5加密
         final String md5Tmp = MD5Utils.md5Hex(configInfo.getContent(), Constants.ENCODE);
         
         KeyHolder keyHolder = new GeneratedKeyHolder();
-        
+
+        // 根据数据库表获取对应的mapper, 通过插件化的形式, 灵活应对使用不同数据库的场景
         ConfigInfoMapper configInfoMapper = mapperManager.findMapper(dataSourceService.getDataSourceType(),
                 TableConstant.CONFIG_INFO);
+        // 将参数转换成对应数据库类型的sql语句，拼接insert into config_info values(....)插入语句
         final String sql = configInfoMapper.insert(
                 Arrays.asList("data_id", "group_id", "tenant_id", "app_name", "content", "md5", "src_ip", "src_user",
                         "gmt_create", "gmt_modified", "c_desc", "c_use", "effect", "type", "c_schema",
                         "encrypted_data_key"));
+        // 获取主键名称，默认值为id
         String[] returnGeneratedKeys = configInfoMapper.getPrimaryKeyGeneratedKeys();
         try {
             jt.update(new PreparedStatementCreator() {
                 @Override
                 public PreparedStatement createPreparedStatement(Connection connection) throws SQLException {
                     Timestamp now = new Timestamp(System.currentTimeMillis());
-                    
+
+                    // 通过预编译的PreparedStatement，设置每个字段的值
                     PreparedStatement ps = connection.prepareStatement(sql, returnGeneratedKeys);
                     ps.setString(1, configInfo.getDataId());
                     ps.setString(2, configInfo.getGroup());
@@ -490,6 +501,7 @@ public class ExternalConfigInfoPersistServiceImpl implements ConfigInfoPersistSe
             final Map<String, Object> configAdvanceInfo) {
         return tjt.execute(status -> {
             try {
+                // 修改之前，先查询出已存在的配置信息
                 ConfigInfo oldConfigInfo = findConfigInfo(configInfo.getDataId(), configInfo.getGroup(),
                         configInfo.getTenant());
                 if (oldConfigInfo == null) {
@@ -508,6 +520,7 @@ public class ExternalConfigInfoPersistServiceImpl implements ConfigInfoPersistSe
                 if (configInfo.getAppName() == null) {
                     configInfo.setAppName(appNameTmp);
                 }
+                // 更新配置，大体思路跟插入一样，根据dataType和表名称获取对应的mapper，然后组装好sql, 执行
                 updateConfigInfoAtomic(configInfo, srcIp, srcUser, configAdvanceInfo);
                 String configTags = configAdvanceInfo == null ? null : (String) configAdvanceInfo.get("config_tags");
                 if (configTags != null) {
@@ -517,7 +530,8 @@ public class ExternalConfigInfoPersistServiceImpl implements ConfigInfoPersistSe
                             configInfo.getGroup(), configInfo.getTenant());
                 }
                 Timestamp now = new Timestamp(System.currentTimeMillis());
-                
+
+                // 插入历史配置记录
                 historyConfigInfoPersistService.insertConfigHistoryAtomic(oldConfigInfo.getId(), oldConfigInfo, srcIp,
                         srcUser, now, "U");
                 return getConfigInfoOperateResult(configInfo.getDataId(), configInfo.getGroup(),

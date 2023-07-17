@@ -67,12 +67,13 @@ public class DumpProcessor implements NacosTaskProcessor {
         String handleIp = dumpTask.getHandleIp();
         boolean isBeta = dumpTask.isBeta();
         String tag = dumpTask.getTag();
-        
+
+        // 构建ConfigDumpEventBuild
         ConfigDumpEvent.ConfigDumpEventBuilder build = ConfigDumpEvent.builder().namespaceId(tenant).dataId(dataId)
                 .group(group).isBeta(isBeta).tag(tag).lastModifiedTs(lastModified).handleIp(handleIp);
         
         if (isBeta) {
-            // if publish beta, then dump config, update beta cache
+            // 如果发布测试版，则转储配置，更新测试版缓存
             ConfigInfo4Beta cf = configInfoBetaPersistService.findConfigInfo4Beta(dataId, group, tenant);
             
             build.remove(Objects.isNull(cf));
@@ -83,6 +84,9 @@ public class DumpProcessor implements NacosTaskProcessor {
             return DumpConfigHandler.configDump(build.build());
         }
         if (StringUtils.isBlank(tag)) {
+            // tag为空的情况，正常情况下都是走的这个分支
+
+            // 查看配置信息
             ConfigInfo cf = configInfoPersistService.findConfigInfo(dataId, group, tenant);
             
             build.remove(Objects.isNull(cf));
@@ -96,6 +100,7 @@ public class DumpProcessor implements NacosTaskProcessor {
             build.content(Objects.isNull(cf) ? null : cf.getContent());
             
         }
+        // 构建出ConfigDumpEvent，然后触发dump配置
         return DumpConfigHandler.configDump(build.build());
     }
 }

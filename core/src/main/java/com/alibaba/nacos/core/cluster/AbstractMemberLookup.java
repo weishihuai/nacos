@@ -39,6 +39,7 @@ public abstract class AbstractMemberLookup implements MemberLookup {
     
     @Override
     public void afterLookup(Collection<Member> members) {
+        // 当成员列表实例化完成后，会通过订阅发布模式将MembersChangeEvent放入DefaultPublisher的队列中。
         this.memberManager.memberChange(members);
     }
     
@@ -51,7 +52,12 @@ public abstract class AbstractMemberLookup implements MemberLookup {
     
     @Override
     public void start() throws NacosException {
+        // 未启动则启动
         if (start.compareAndSet(false, true)) {
+            /**
+             * 1. 对于单机模式, 直接获取本机地址作为集群列表
+             * 2. 对于FileConfigMemberLookup, 首先读取配置文件中的成员列表，然后通过MemberUtil工具类的singleParse方法构造Member对象且默认状态为UP
+             */
             doStart();
         }
     }

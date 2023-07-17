@@ -42,7 +42,10 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class DistroProtocol {
-    
+
+    /**
+     * 集群成员的管理类
+     */
     private final ServerMemberManager memberManager;
     
     private final DistroComponentHolder distroComponentHolder;
@@ -56,15 +59,19 @@ public class DistroProtocol {
         this.memberManager = memberManager;
         this.distroComponentHolder = distroComponentHolder;
         this.distroTaskEngineHolder = distroTaskEngineHolder;
+        // 在服务启动时会去其它成员服务中同步注册的实例数据
         startDistroTask();
     }
     
     private void startDistroTask() {
+        // 只有集群模式才会执行同步
         if (EnvUtil.getStandaloneMode()) {
             isInitialized = true;
             return;
         }
+        // 注册的客户端服务校验5s后开始，每5s执行一次
         startVerifyTask();
+        // 注册的客户端服务数据同步
         startLoadTask();
     }
     
@@ -101,6 +108,7 @@ public class DistroProtocol {
      * @param action    the action of data operation
      */
     public void sync(DistroKey distroKey, DataOperation action) {
+        // 配置同步延迟的时间：默认为1s
         sync(distroKey, action, DistroConfig.getInstance().getSyncDelayMillis());
     }
     
@@ -112,6 +120,7 @@ public class DistroProtocol {
      * @param delay     delay time for sync
      */
     public void sync(DistroKey distroKey, DataOperation action, long delay) {
+        // 遍历每个除自己以外的其它成员
         for (Member each : memberManager.allMembersWithoutSelf()) {
             syncToTarget(distroKey, action, each.getAddress(), delay);
         }
@@ -126,9 +135,14 @@ public class DistroProtocol {
      * @param delay        delay time for sync
      */
     public void syncToTarget(DistroKey distroKey, DataOperation action, String targetServer, long delay) {
+        // 重新封装DistroKey，将目标节点的地址也封装进去
         DistroKey distroKeyWithTarget = new DistroKey(distroKey.getResourceKey(), distroKey.getResourceType(),
                 targetServer);
+        // 包装成一个延时任务，交给延迟任务引擎来处理
         DistroDelayTask distroDelayTask = new DistroDelayTask(distroKeyWithTarget, action, delay);
+        // 往延时任务引擎中加入DistroDelayTask任务,最终将会调用DistroDelayTaskProcessor.process方法
+        // distroTaskEngineHolder.getDelayTaskExecuteEngine()返回的是DistroDelayTaskExecuteEngine，它继承自NacosDelayTaskExecuteEngine,
+        // 其构造方法中初始化了一个定时任务ProcessRunnable，不断从阻塞队列中拿出任务出来执行（ConcurrentHashMap<Object, AbstractDelayTask> tasks）
         distroTaskEngineHolder.getDelayTaskExecuteEngine().addTask(distroKeyWithTarget, distroDelayTask);
         if (Loggers.DISTRO.isDebugEnabled()) {
             Loggers.DISTRO.debug("[DISTRO-SCHEDULE] {} to {}", distroKey, targetServer);
@@ -170,6 +184,7 @@ public class DistroProtocol {
             Loggers.DISTRO.warn("[DISTRO] Can't find data process for received data {}", resourceType);
             return false;
         }
+        // 通过处理器处理接收到的数据
         return dataProcessor.processData(distroData);
     }
     

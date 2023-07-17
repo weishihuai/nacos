@@ -248,12 +248,12 @@ public abstract class RpcClient implements Closeable {
      * Start this client.
      */
     public final void start() throws NacosException {
-        
+        // 设置状态为启动状态
         boolean success = rpcClientStatus.compareAndSet(RpcClientStatus.INITIALIZED, RpcClientStatus.STARTING);
         if (!success) {
             return;
         }
-        
+        // 创建线程池
         clientEventExecutor = new ScheduledThreadPoolExecutor(2, r -> {
             Thread t = new Thread(r);
             t.setName("com.alibaba.nacos.client.remote.worker");
@@ -266,6 +266,7 @@ public abstract class RpcClient implements Closeable {
             while (!clientEventExecutor.isTerminated() && !clientEventExecutor.isShutdown()) {
                 ConnectionEvent take;
                 try {
+                    // 处理连接事件的阻塞队列
                     take = eventLinkedBlockingQueue.take();
                     if (take.isConnected()) {
                         notifyConnected();
@@ -284,6 +285,7 @@ public abstract class RpcClient implements Closeable {
                     if (isShutdown()) {
                         break;
                     }
+                    // 处理重新连接
                     ReconnectContext reconnectContext = reconnectionSignal.poll(rpcClientConfig.connectionKeepAlive(),
                             TimeUnit.MILLISECONDS);
                     if (reconnectContext == null) {
@@ -383,10 +385,11 @@ public abstract class RpcClient implements Closeable {
         } else {
             switchServerAsync();
         }
-        
+
+        // 注册连接重置处理器
         registerServerRequestHandler(new ConnectResetRequestHandler());
-        
-        // register client detection request.
+
+        // 注册网络请求处理器
         registerServerRequestHandler(request -> {
             if (request instanceof ClientDetectionRequest) {
                 return new ClientDetectionResponse();

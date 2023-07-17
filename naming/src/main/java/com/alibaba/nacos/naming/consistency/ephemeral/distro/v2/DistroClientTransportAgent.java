@@ -69,6 +69,7 @@ public class DistroClientTransportAgent implements DistroTransportAgent {
             return true;
         }
         DistroDataRequest request = new DistroDataRequest(data, data.getType());
+        // 获取目标节点
         Member member = memberManager.find(targetServer);
         if (checkTargetServerStatusUnhealthy(member)) {
             Loggers.DISTRO
@@ -77,6 +78,8 @@ public class DistroClientTransportAgent implements DistroTransportAgent {
             return false;
         }
         try {
+            // 同步发送 DistroDataRequest 请求
+            // 真正处理请求是在：com.alibaba.nacos.naming.remote.rpc.handler.DistroDataRequestHandler.handle方法
             Response response = clusterRpcClientProxy.sendRequest(member, request);
             return checkResponse(response);
         } catch (NacosException e) {
@@ -101,6 +104,7 @@ public class DistroClientTransportAgent implements DistroTransportAgent {
             return;
         }
         try {
+            // 异步发送 DistroDataRequest 请求
             clusterRpcClientProxy.asyncRequest(member, request, new DistroRpcCallbackWrapper(callback, member));
         } catch (NacosException nacosException) {
             callback.onFailed(nacosException);

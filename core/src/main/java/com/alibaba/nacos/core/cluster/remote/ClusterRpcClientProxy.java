@@ -193,8 +193,10 @@ public class ClusterRpcClientProxy extends MemberChangeListener {
      * @throws NacosException exception may throws.
      */
     public void asyncRequest(Member member, Request request, RequestCallBack callBack) throws NacosException {
+        // 获取成员的rpc客户端
         RpcClient client = RpcClientFactory.getClient(memberClientKey(member));
         if (client != null) {
+            // 异步处理
             client.asyncRequest(request, callBack);
         } else {
             throw new NacosException(CLIENT_INVALID_PARAM, "No rpc client related to member: " + member);

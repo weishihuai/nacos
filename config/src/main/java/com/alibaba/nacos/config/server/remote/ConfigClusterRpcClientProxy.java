@@ -48,8 +48,8 @@ public class ConfigClusterRpcClientProxy {
      */
     public void syncConfigChange(Member member, ConfigChangeClusterSyncRequest request, RequestCallBack callBack)
             throws NacosException {
-    
+        // 异步处理
+        // grpc真正的处理类是在：com.alibaba.nacos.config.server.remote.ConfigChangeClusterSyncRequestHandler.handle
         clusterRpcClientProxy.asyncRequest(member, request, callBack);
-        
     }
 }

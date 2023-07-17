@@ -130,9 +130,12 @@ public abstract class ConfigTransportClient {
      * base start client.
      */
     public void start() throws NacosException {
+        // 认证服务，主要是通过Secret Key和Access Key做认证用
         securityProxy.login(this.properties);
+        // 每隔5s执行一次认证
         this.executor.scheduleWithFixedDelay(() -> securityProxy.login(properties), 0,
                 this.securityInfoRefreshIntervalMills, TimeUnit.MILLISECONDS);
+        // 内部启动
         startInternal();
     }
     

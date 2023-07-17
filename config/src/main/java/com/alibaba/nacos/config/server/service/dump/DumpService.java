@@ -160,7 +160,9 @@ public abstract class DumpService {
         this.dumpAllProcessor = new DumpAllProcessor(this);
         this.dumpAllBetaProcessor = new DumpAllBetaProcessor(this);
         this.dumpAllTagProcessor = new DumpAllTagProcessor(this);
+        // 创建一个TaskManager
         this.dumpTaskMgr = new TaskManager("com.alibaba.nacos.server.DumpTaskManager");
+        // 设置默认的Processor处理（DumpProcessor）
         this.dumpTaskMgr.setDefaultTaskProcessor(processor);
         
         this.dumpAllTaskMgr = new TaskManager("com.alibaba.nacos.server.DumpAllTaskManager");
@@ -405,9 +407,9 @@ public abstract class DumpService {
     public void dumpFormal(String dataId, String group, String tenant, long lastModified, String handleIp) {
         String groupKey = GroupKey2.getKey(dataId, group, tenant);
         String taskKey = dataId + group + tenant;
+        // 将DumpTask添加到TaskManager任务管理器，它将异步执行
         dumpTaskMgr.addTask(taskKey, new DumpTask(groupKey, false, false, false, null, lastModified, handleIp));
         DUMP_LOG.info("[dump] add formal task. groupKey={}", groupKey);
-        
     }
     
     /**
@@ -456,6 +458,7 @@ public abstract class DumpService {
     public void dumpTag(String dataId, String group, String tenant, String tag, long lastModified, String handleIp) {
         String groupKey = GroupKey2.getKey(dataId, group, tenant);
         String taskKey = groupKey + "+tag+" + tag;
+        // 添加到dumpTask后异步执行
         dumpTaskMgr.addTask(taskKey, new DumpTask(groupKey, false, false, true, tag, lastModified, handleIp));
         DUMP_LOG.info("[dump] add tag task. groupKey={},tag={}", groupKey, tag);
         

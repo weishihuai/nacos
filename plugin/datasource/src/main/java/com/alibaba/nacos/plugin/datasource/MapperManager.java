@@ -100,11 +100,13 @@ public class MapperManager {
         if (StringUtils.isBlank(dataSource) || StringUtils.isBlank(tableName)) {
             throw new NacosRuntimeException(FIND_DATASOURCE_ERROR_CODE, "dataSource or tableName is null");
         }
+        // 从SPI缓存中获取，这个是在MapperManager构造方法中初始化的
         Map<String, Mapper> tableMapper = MAPPER_SPI_MAP.get(dataSource);
         if (Objects.isNull(tableMapper)) {
             throw new NacosRuntimeException(FIND_DATASOURCE_ERROR_CODE,
                     "[MapperManager] Failed to find the datasource,dataSource:" + dataSource);
         }
+        // 根据表名称获取mapper
         Mapper mapper = tableMapper.get(tableName);
         if (Objects.isNull(mapper)) {
             throw new NacosRuntimeException(FIND_TABLE_ERROR_CODE,

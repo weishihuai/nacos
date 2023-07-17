@@ -40,25 +40,38 @@ public class EncryptionHandler {
     private static final String PREFIX = "cipher-";
     
     /**
-     * Execute encryption.
+     * 执行加密
+     *
+     * <p>
+     *      1.判断是否需要处理加密
+     *      2.需要的话，去插件里面获取
+     *      3.获取不到打日志，返回非加密处理（相当于兜底，没有就默认不加密处理了）
+     *      4.获取到加密插件，利用插件获取秘钥，然后再加密
+     * </p>
      *
      * @param dataId  dataId
      * @param content Content that needs to be encrypted.
      * @return Return key and ciphertext.
      */
     public static Pair<String, String> encryptHandler(String dataId, String content) {
+        // 检查是否需要加密
         if (!checkCipher(dataId)) {
             return Pair.with("", content);
         }
         Optional<String> algorithmName = parseAlgorithmName(dataId);
+        // 获取加密的处理类
+        // EncryptionPluginManager.instance(): 返回单例实例
         Optional<EncryptionPluginService> optional = algorithmName
                 .flatMap(EncryptionPluginManager.instance()::findEncryptionService);
         if (!optional.isPresent()) {
             LOGGER.warn("[EncryptionHandler] [encryptHandler] No encryption program with the corresponding name found");
+            // 获取不到，还是走非加密型
             return Pair.with("", content);
         }
         EncryptionPluginService encryptionPluginService = optional.get();
+        // 根据扩展的插件类，获取密钥
         String secretKey = encryptionPluginService.generateSecretKey();
+        // 利用密钥加密
         String encryptContent = encryptionPluginService.encrypt(secretKey, content);
         return Pair.with(encryptionPluginService.encryptSecretKey(secretKey), encryptContent);
     }
@@ -105,6 +118,7 @@ public class EncryptionHandler {
      * @return boolean whether data id needs encrypt
      */
     private static boolean checkCipher(String dataId) {
+        // 判断dataId的前缀，如果以cipher-开头就是需要加密的
         return dataId.startsWith(PREFIX) && !PREFIX.equals(dataId);
     }
 }

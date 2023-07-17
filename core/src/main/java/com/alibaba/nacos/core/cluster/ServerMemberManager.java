@@ -108,7 +108,7 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
     private static final long DEFAULT_TASK_DELAY_TIME = 5_000L;
     
     /**
-     * Cluster node list.
+     * nacos集群成员列表
      */
     private volatile ConcurrentSkipListMap<String, Member> serverList;
     
@@ -123,7 +123,7 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
     private int port;
     
     /**
-     * Address information for the local node.
+     * 当前机器的地址
      */
     private String localAddress;
     
@@ -133,7 +133,7 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
     private MemberLookup lookup;
     
     /**
-     * self member obj.
+     * 当前机器
      */
     private volatile Member self;
     
@@ -145,20 +145,23 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
     private volatile Set<String> memberAddressInfos = new ConcurrentHashSet<>();
     
     /**
-     * Broadcast this node element information task.
+     * 广播节点信息的任务
      */
     private final MemberInfoReportTask infoReportTask = new MemberInfoReportTask();
     
     private final UnhealthyMemberInfoReportTask unhealthyMemberInfoReportTask = new UnhealthyMemberInfoReportTask();
     
     public ServerMemberManager(ServletContext servletContext) throws Exception {
+        // 先创建一个支持并发，跳表的HashMap
         this.serverList = new ConcurrentSkipListMap<>();
         EnvUtil.setContextPath(servletContext.getContextPath());
+        // 初始化
         init();
     }
     
     protected void init() throws NacosException {
         Loggers.CORE.info("Nacos-related cluster resource initialization");
+        // 处理本机ip
         this.port = EnvUtil.getProperty(SERVER_PORT_PROPERTY, Integer.class, DEFAULT_SERVER_PORT);
         this.localAddress = InetUtils.getSelfIP() + ":" + port;
         this.self = MemberUtil.singleParse(this.localAddress);
@@ -166,13 +169,14 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
         
         // init abilities.
         this.self.setAbilities(initMemberAbilities());
-        
+
+        // 构造函数初始化时首先会将当前机器加入到集群成员列表中
         serverList.put(self.getAddress(), self);
         
-        // register NodeChangeEvent publisher to NotifyManager
+        // 注册MembersChangeEvent服务端节点变更事件和IP变更事件IPChangeEvent
         registerClusterEvent();
         
-        // Initializes the lookup mode
+        // 加载其它的集群成员列表
         initAndStartLookup();
         
         if (serverList.isEmpty()) {
@@ -191,13 +195,12 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
     }
     
     private void registerClusterEvent() {
-        // Register node change events
+        // 注册服务端节点变更事件
         NotifyCenter.registerToPublisher(MembersChangeEvent.class,
                 EnvUtil.getProperty(MEMBER_CHANGE_EVENT_QUEUE_SIZE_PROPERTY, Integer.class,
                         DEFAULT_MEMBER_CHANGE_EVENT_QUEUE_SIZE));
-        
-        // The address information of this node needs to be dynamically modified
-        // when registering the IP change of this node
+
+        // 注册节点IP变更时需要动态修改该节点地址信息
         NotifyCenter.registerSubscriber(new Subscriber<InetUtils.IPChangeEvent>() {
             @Override
             public void onEvent(InetUtils.IPChangeEvent event) {
@@ -224,6 +227,7 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
     }
     
     private void initAndStartLookup() throws NacosException {
+        // 根据lookupType来创建具体的MemberLookup来加载集群成员列表
         this.lookup = LookupFactory.createLookUp(this);
         isUseAddressServer = this.lookup.useAddressServer();
         this.lookup.start();
@@ -255,20 +259,25 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
         Loggers.CLUSTER.debug("member information update : {}", newMember);
         
         String address = newMember.getAddress();
+        // 若当前地址不在服务列表中
         if (!serverList.containsKey(address)) {
             Loggers.CLUSTER.warn("address {} want to update Member, but not in member list!", newMember.getAddress());
             return false;
         }
         
         serverList.computeIfPresent(address, (s, member) -> {
+            // 若服务已下线，则从memberAddressInfos移除
             if (NodeState.DOWN.equals(newMember.getState())) {
                 memberAddressInfos.remove(newMember.getAddress());
             }
+            // 若有属性变更则为true
             boolean isPublishChangeEvent = MemberUtil.isBasicInfoChanged(newMember, member);
             newMember.setExtendVal(MemberMetaDataConstants.LAST_REFRESH_TIME, System.currentTimeMillis());
+            // 将新信息更新到旧Member上
             MemberUtil.copy(newMember, member);
+            // 若接收到的服务端成员存在信息变更
             if (isPublishChangeEvent) {
-                // member basic data changes and all listeners need to be notified
+                // 通过发布订阅模式通知DistroMapper更新healthyList
                 notifyMemberChange(member);
             }
             return member;
@@ -355,14 +364,18 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
         if (members == null || members.isEmpty()) {
             return false;
         }
-        
+
+        // 是否包含本机地址
         boolean isContainSelfIp = members.stream()
                 .anyMatch(ipPortTmp -> Objects.equals(localAddress, ipPortTmp.getAddress()));
         
         if (isContainSelfIp) {
+            // 包含本机地址
             isInIpList = true;
         } else {
+            // 不包含本机地址
             isInIpList = false;
+            // 添加本机到集群成员列表中
             members.add(this.self);
             Loggers.CLUSTER.warn("[serverlist] self ip {} not in serverlist {}", self, members);
         }
@@ -404,6 +417,8 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
             Loggers.CLUSTER.info("[serverlist] changed to : {}", finalMembers);
             MemberUtil.syncToFile(finalMembers);
             Event event = MembersChangeEvent.builder().members(finalMembers).build();
+            // 发布成员变更事件
+            // 这个事件最终会被com.alibaba.nacos.naming.core.DistroMapper.onEvent订阅者消费
             NotifyCenter.publishEvent(event);
         } else {
             if (Loggers.CLUSTER.isDebugEnabled()) {
@@ -485,6 +500,13 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
         }
         getSelf().setState(NodeState.UP);
         if (!EnvUtil.getStandaloneMode()) {
+            /**
+             * 集群模式下
+             * 通过周期延时任务对集群每个成员发送心跳检查并更新集群节点状态，该任务是通过MemberInfoReportTask来完成的，
+             * ServerMemberManager实现了ApplicationListener接口，在onApplicationEvent方法中添加了该任务
+             *
+             * 延迟5s后执行
+             */
             GlobalExecutor.scheduleByCommon(this.infoReportTask, DEFAULT_TASK_DELAY_TIME);
             GlobalExecutor.scheduleByCommon(this.unhealthyMemberInfoReportTask, DEFAULT_TASK_DELAY_TIME);
         }
@@ -549,6 +571,7 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
         
         @Override
         protected void executeBody() {
+            // 获取除开自己的集群中其它节点
             List<Member> members = ServerMemberManager.this.allMembersWithoutSelf();
             
             //report member count per 50 seconds.
@@ -562,13 +585,16 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
             }
             
             this.cursor = (this.cursor + 1) % members.size();
+            // 每一个任务周期只会向其中一个节点发送数据
             Member target = members.get(cursor);
             
             Loggers.CLUSTER.debug("report the metadata to the node : {}", target.getAddress());
             
             if (target.getAbilities().getRemoteAbility().isGrpcReportEnabled()) {
+                // grpc请求
                 reportByGrpc(target);
             } else {
+                // http请求：/v1/core/cluster/report
                 reportByHttp(target);
             }
         }
@@ -584,9 +610,11 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
                         new Callback<String>() {
                             @Override
                             public void onReceive(RestResult<String> result) {
+                                // 请求成功：检查更新其他成员的状态，也更新其他成员节点上自己的状态
                                 if (result.ok()) {
                                     handleReportResult(result.getData(), target);
                                 } else {
+                                    // 请求失败
                                     Loggers.CLUSTER.warn("failed to report new info to target node : {}, result : {}",
                                             target.getAddress(), result);
                                     MemberUtil.onFail(ServerMemberManager.this, target);
@@ -597,6 +625,7 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
                             public void onError(Throwable throwable) {
                                 Loggers.CLUSTER.error("failed to report new info to target node : {}, error : {}",
                                         target.getAddress(), ExceptionUtil.getAllExceptionMsg(throwable));
+                                // 请求错误
                                 MemberUtil.onFail(ServerMemberManager.this, target, throwable);
                             }
                             
@@ -643,10 +672,12 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
         
         @Override
         protected void after() {
+            // executeBody执行完后再通过after方法递归将任务丢回延时线程池中。第一次是5s后执行，后续是每2s执行一次
             GlobalExecutor.scheduleByCommon(this, 2_000L);
         }
         
         private void handleReportResult(String reportResult, Member target) {
+            // 请求接口成功直接将成员状态设置为UP且重置失败访问次数
             if (isBooleanResult(reportResult)) {
                 MemberUtil.onSuccess(ServerMemberManager.this, target);
                 return;
