@@ -14,4 +14,9 @@ public class DiscoveryProviderController {
         return "Nacos is coming :" + text;
     }
 
+    @RequestMapping(value = "/feign/{text}", method = RequestMethod.GET)
+    public String feign(@PathVariable(value = "text") String text) {
+        return "OpenFeign is coming :" + text;
+    }
+
 }

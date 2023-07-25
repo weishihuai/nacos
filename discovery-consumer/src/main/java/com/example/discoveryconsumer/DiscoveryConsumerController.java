@@ -1,5 +1,6 @@
 package com.example.discoveryconsumer;
 
+import com.example.feign.DiscoveryProviderClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,8 +15,16 @@ public class DiscoveryConsumerController {
     @Autowired
     private RestTemplate restTemplate;
 
+    @Autowired
+    private DiscoveryProviderClient discoveryProviderClient;
+
     @GetMapping(value = "/hello/{text}")
     public String hello(@PathVariable(value = "text") String text) {
         return restTemplate.getForObject("http://discovery-provider/provider/hello/" + text, String.class);
+    }
+
+    @GetMapping(value = "/feign/{text}")
+    public String feign(@PathVariable(value = "text") String text) {
+        return discoveryProviderClient.feign(text);
     }
 }
